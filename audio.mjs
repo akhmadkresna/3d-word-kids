@@ -62,6 +62,16 @@ const voices = {
       t0 += d;
     }
   },
+  splash(b, c) {
+    const r = rng(31); let l1 = 0, l2 = 0;
+    add(b, c.t0, 1.2, c.g, (t) => { const x = r() * 2 - 1; l1 += 0.22 * (x - l1); l2 += 0.03 * (l1 - l2); return (l1 - l2) * 3 * Math.min(1, t / 0.01) * Math.exp(-t * 3.2); });
+    add(b, c.t0, 0.5, c.g * 0.7, (t) => Math.sin(TAU * (260 - 160 * t) * t) * Math.exp(-t * 7));
+  },
+  bloop(b, c) { // little bubbles
+    for (const [o, f] of [[0, 330], [0.22, 420], [0.4, 290], [0.62, 380]]) {
+      add(b, c.t0 + o, 0.16, c.g, (t) => Math.sin(TAU * (f + 900 * t) * t) * Math.exp(-t * 18));
+    }
+  },
   pop(b, c) {
     const r = rng(6);
     add(b, c.t0, 0.25, c.g, (t) => ((r() * 2 - 1) * 0.6 + Math.sin(TAU * (500 + 1500 * Math.exp(-t * 30)) * t)) * Math.exp(-t * 28));

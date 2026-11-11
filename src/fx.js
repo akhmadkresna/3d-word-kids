@@ -60,3 +60,29 @@ export function createSmoke(scene, { count = 10, seed = 11, color = 0xe0e0e0, li
     }
   };
 }
+
+// Water splash: droplets on ballistic arcs + an expanding ripple ring. update(tau, origin, waterY).
+export function createSplash(scene, { count = 40, seed = 23, life = 1.8 } = {}) {
+  const r = rng(seed), drops = [];
+  const dm = new THREE.MeshBasicMaterial({ color: 0xd6f1ff, transparent: true, opacity: 0.9 });
+  for (let i = 0; i < count; i++) {
+    const m = quiet(new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), dm)); m.visible = false; scene.add(m);
+    const a = r() * 6.28, sp = 1 + r() * 3.5;
+    drops.push({ m, vx: Math.cos(a) * sp, vz: Math.sin(a) * sp, vy: 5 + r() * 6, s: 0.6 + r() * 1.2 });
+  }
+  const ring = quiet(new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })));
+  ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
+  const ring2 = ring.clone(); ring2.material = ring.material.clone(); scene.add(ring2);
+  return (tau, o, waterY = 0.08) => {
+    for (const d of drops) {
+      const y = o.y + d.vy * tau - 9 * tau * tau;
+      if (tau < 0 || y < waterY) { d.m.visible = false; continue; }
+      d.m.visible = true; d.m.position.set(o.x + d.vx * tau, y, o.z + d.vz * tau); d.m.scale.setScalar(d.s);
+    }
+    for (const [rg, delay, spd] of [[ring, 0, 4.5], [ring2, 0.35, 3.5]]) {
+      const t = tau - delay;
+      if (t < 0 || t > life) { rg.visible = false; continue; }
+      rg.visible = true; rg.position.set(o.x, waterY + 0.02, o.z); rg.scale.setScalar(0.4 + spd * t); rg.material.opacity = 0.8 * (1 - t / life);
+    }
+  };
+}

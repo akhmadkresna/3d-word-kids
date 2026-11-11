@@ -16,6 +16,12 @@ npm run batch                                 # one video per vehicle in VEHICLE
 # gallery to browse models: ?scenario=lineup&vehicle=car-kit/sedan,car-kit/taxi,train-kit/train-tram-modern
 ```
 
+## Episodes (scenarios)
+- `carJump` – ramp jump over a crate wall. Fail: crash, crates tumble. Success: confetti.
+- `riverJump` – flooded road. Fail: splash into the water. Success: clears the river.
+- `planeHoops` – older placeholder (no world/audio yet).
+Each has an optional `<name>.cues.js` (timings + sound cues). Batch: `node batch.mjs 30 riverJump`.
+
 ## World
 `src/world.js` builds the environment shared by every scenario: gradient sky, clouds, hills, grass, racing road with barriers,
 fences, grandstands/tents, flags, trees, sun with shadows. Deterministic (seeded) so renders are repeatable.
