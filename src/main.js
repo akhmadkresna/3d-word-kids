@@ -15,8 +15,8 @@ await buildWorld(scene, renderer, params.get('theme') || 'day');
 const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 1200);
 
 const mod = await import(`./scenarios/${name}.js`);
-const update = await mod.setup(scene, camera, { vehicle: params.get('vehicle') });
-scene.traverse((o) => { if (o.isMesh && !o.material.isShaderMaterial && !o.material.map?.isCanvasTexture) { o.castShadow = true; o.receiveShadow = true; } });
+const update = await mod.setup(scene, camera, { vehicle: params.get('vehicle'), outcome: params.get('outcome') });
+scene.traverse((o) => { if (o.isMesh && !o.userData.noShadow && !o.material.isShaderMaterial && !o.material.map?.isCanvasTexture) { o.castShadow = true; o.receiveShadow = true; } });
 
 // The capture script drives time; open the page without ?live to preview in real time.
 window.__duration = mod.duration;

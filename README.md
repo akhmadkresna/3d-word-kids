@@ -10,6 +10,7 @@ npm run dev                                   # preview: http://localhost:5173/?
 npm run capture -- carJump 30 --vehicle=train-kit/train-diesel-a   # -> out/carJump-train_kit_train_diesel_a.mp4
 npm run capture -- carJump 30 --vehicle=car-kit/police --theme=sunset   # themes: day | sunset
 npm run capture -- carJump 30 --vehicle=car-kit/police --music=music.mp3
+npm run capture -- carJump 30 --outcome=fail      # fail | success | both (default: fail, fade, then successful retry = 16 s)
 npm run batch                                 # one video per vehicle in VEHICLES (src/vehicles.js)
 # gallery to browse models: ?scenario=lineup&vehicle=car-kit/sedan,car-kit/taxi,train-kit/train-tram-modern
 ```
