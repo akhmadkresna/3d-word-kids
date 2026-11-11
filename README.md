@@ -16,6 +16,15 @@ npm run batch                                 # one video per vehicle in VEHICLE
 # gallery to browse models: ?scenario=lineup&vehicle=car-kit/sedan,car-kit/taxi,train-kit/train-tram-modern
 ```
 
+## Make a batch for the channel
+```bash
+node queue.mjs --count=7 --dry-run          # just show the plan (titles, vehicles, themes)
+node queue.mjs --count=7 --fps=30           # render all -> out/queue/NN-*.mp4 + .jpg thumbnails + episodes.json
+```
+Never repeats a vehicle until the pool is used up, alternates episodes, mixes day/sunset (`--seed=N` for a different mix).
+Resumable: rerun and finished videos are skipped. `episodes.json` has title, description (with CC0 credit) and `madeForKids: true` for upload.
+~8 min per video at 30fps on CPU, so 7 videos is about an hour; run it in the background.
+
 ## Episodes (scenarios)
 - `carJump` – ramp jump over a crate wall. Fail: crash, crates tumble. Success: confetti.
 - `riverJump` – flooded road. Fail: splash into the water. Success: clears the river.

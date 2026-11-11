@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "capture": "node capture.mjs",
-    "batch": "node batch.mjs"
+    "batch": "node batch.mjs",
+    "queue": "node queue.mjs"
   },
   "repository": {
     "type": "git",

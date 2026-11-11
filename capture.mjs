@@ -1,4 +1,4 @@
-// Usage: node capture.mjs <scenario> [fps=30] [--vehicle=vehicle-truck-red] [--music=file.mp3] [--theme=day|sunset] [--outcome=fail|success|both] [--no-audio] [--no-music]
+// Usage: node capture.mjs <scenario> [fps=30] [--vehicle=vehicle-truck-red] [--music=file.mp3] [--theme=day|sunset] [--outcome=fail|success|both] [--no-audio] [--no-music] [--out=path.mp4]
 // Renders the scenario frame-by-frame (deterministic) and pipes PNGs into ffmpeg.
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
@@ -11,7 +11,7 @@ const [scenario = 'carJump', fpsArg = '30'] = process.argv.slice(2).filter((a) =
 const { vehicle = '', music, theme = 'day', outcome = '' } = flags;
 const fps = Number(fpsArg);
 fs.mkdirSync('out', { recursive: true });
-const outFile = `out/${scenario}${outcome ? '-' + outcome : ''}${theme !== 'day' ? '-' + theme : ''}${vehicle ? '-' + vehicle.replace(/^vehicle-/, '').replace(/[^a-z0-9]+/gi, '_').slice(0, 60) : ''}.mp4`;
+const outFile = flags.out || `out/${scenario}${outcome ? '-' + outcome : ''}${theme !== 'day' ? '-' + theme : ''}${vehicle ? '-' + vehicle.replace(/^vehicle-/, '').replace(/[^a-z0-9]+/gi, '_').slice(0, 60) : ''}.mp4`;
 
 const server = await createServer({ logLevel: 'error', server: { port: 5199 } });
 await server.listen();
