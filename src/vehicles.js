@@ -75,3 +75,18 @@ export async function loadVehicle(name, length = 3.6) {
   model.traverse((o) => { if (/wheel/i.test(o.name)) g.userData.wheels.push(o); });
   return g;
 }
+
+// Generic cached model loader. opts: { scale, center (center x/z, sit on y=0) }
+const cache = new Map();
+export async function loadModel(name, { scale = 1, center = false } = {}) {
+  if (!cache.has(name)) cache.set(name, loader.loadAsync(`/models/${name}.glb`));
+  const gltf = await cache.get(name);
+  const m = gltf.scene.clone(true);
+  const g = new THREE.Group(); g.add(m);
+  if (center) {
+    const b = new THREE.Box3().setFromObject(m), c = b.getCenter(new THREE.Vector3());
+    m.position.set(-c.x, -b.min.y, -c.z);
+  }
+  g.scale.setScalar(scale);
+  return g;
+}
