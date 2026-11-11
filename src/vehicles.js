@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 // Primitive vehicles so the project runs with zero downloads.
 // Swap for free CC0 glTF models (Kenney / Quaternius) via GLTFLoader later.
 const mat = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 });
@@ -37,4 +38,28 @@ export function makeBarrel() {
 export function makeHoop(color = 0xffeb3b) {
   const m = new THREE.Mesh(new THREE.TorusGeometry(2, 0.2, 12, 32), mat(color));
   return m;
+}
+
+// ---- Real CC0 models (Kenney) ----
+export const VEHICLES = ['vehicle-truck-red', 'vehicle-truck-yellow', 'vehicle-truck-green',
+  'vehicle-truck-purple', 'vehicle-motorcycle'];
+const loader = new GLTFLoader();
+
+// Loads a glb, scales it to `length` units long, rests it on y=0 and faces it toward -Z.
+export async function loadVehicle(name, length = 3.6) {
+  const gltf = await loader.loadAsync(`/models/${name}.glb`);
+  const model = gltf.scene;
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const k = length / Math.max(size.x, size.z);
+  model.scale.setScalar(k);
+  box.setFromObject(model);
+  const c = box.getCenter(new THREE.Vector3());
+  model.position.set(-c.x, -box.min.y, -c.z);
+  model.rotation.y = Math.PI; // Kenney models face +Z; we drive toward -Z
+  model.position.x *= -1; model.position.z *= -1;
+  const g = new THREE.Group(); g.add(model);
+  g.userData.wheels = [];
+  model.traverse((o) => { if (/wheel/i.test(o.name)) g.userData.wheels.push(o); });
+  return g;
 }

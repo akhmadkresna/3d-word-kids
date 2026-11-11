@@ -4,7 +4,8 @@
   "description": "3D kids video pipeline (Three.js + Playwright + ffmpeg).",
   "scripts": {
     "dev": "vite",
-    "capture": "node capture.mjs"
+    "capture": "node capture.mjs",
+    "batch": "node batch.mjs"
   },
   "repository": {
     "type": "git",

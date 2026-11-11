@@ -1,14 +1,16 @@
-// Usage: node capture.mjs <scenario> [fps=30] [music.mp3]
+// Usage: node capture.mjs <scenario> [fps=30] [--vehicle=vehicle-truck-red] [--music=file.mp3]
 // Renders the scenario frame-by-frame (deterministic) and pipes PNGs into ffmpeg.
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 
-const [scenario = 'carJump', fpsArg = '30', music] = process.argv.slice(2);
+const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')));
+const [scenario = 'carJump', fpsArg = '30'] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const { vehicle = '', music } = flags;
 const fps = Number(fpsArg);
 fs.mkdirSync('out', { recursive: true });
-const outFile = `out/${scenario}.mp4`;
+const outFile = `out/${scenario}${vehicle ? '-' + vehicle.replace('vehicle-', '') : ''}.mp4`;
 
 const server = await createServer({ logLevel: 'error', server: { port: 5199 } });
 await server.listen();
@@ -18,7 +20,7 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 page.on('pageerror', (e) => console.error('page error:', e.message));
-await page.goto(`http://localhost:5199/?scenario=${scenario}`);
+await page.goto(`http://localhost:5199/?scenario=${scenario}&vehicle=${vehicle}`);
 await page.waitForFunction(() => window.__ready, null, { timeout: 30000 });
 const duration = await page.evaluate(() => window.__duration);
 const frames = Math.round(duration * fps);

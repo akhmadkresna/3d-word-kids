@@ -21,7 +21,7 @@ ground.rotation.x = -Math.PI / 2; scene.add(ground);
 const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 500);
 
 const mod = await import(`./scenarios/${name}.js`);
-const update = mod.setup(scene, camera);
+const update = await mod.setup(scene, camera, { vehicle: params.get('vehicle') });
 
 // The capture script drives time; open the page without ?live to preview in real time.
 window.__duration = mod.duration;
