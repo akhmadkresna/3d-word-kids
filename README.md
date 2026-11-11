@@ -11,6 +11,7 @@ npm run capture -- carJump 30 --vehicle=train-kit/train-diesel-a   # -> out/carJ
 npm run capture -- carJump 30 --vehicle=car-kit/police --theme=sunset   # themes: day | sunset
 npm run capture -- carJump 30 --vehicle=car-kit/police --music=music.mp3
 npm run capture -- carJump 30 --outcome=fail      # fail | success | both (default: fail, fade, then successful retry = 16 s)
+# audio is automatic (procedural sfx + a bouncy tune, see audio.mjs). Flags: --no-audio  --no-music  --music=your.mp3 (replaces the generated tune)
 npm run batch                                 # one video per vehicle in VEHICLES (src/vehicles.js)
 # gallery to browse models: ?scenario=lineup&vehicle=car-kit/sedan,car-kit/taxi,train-kit/train-tram-modern
 ```

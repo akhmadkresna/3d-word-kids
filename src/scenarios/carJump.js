@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { loadVehicle, loadModel } from '../vehicles.js';
 import { createFade, createConfetti, createSmoke } from '../fx.js';
+import { FAIL_LEN, WIN_LEN, TI } from './carJump.cues.js'; // TI = impact time within the fail attempt
 
 // ?outcome=fail | success | both (default: fail first, fade, then a successful retry)
 // Everything is a pure function of t (crash physics is pre-simulated at fixed dt), so renders are deterministic.
-const FAIL_LEN = 7, WIN_LEN = 9, TI = 4.1; // TI = impact time within the fail attempt
 const TILT = 0.28, T = Math.tan(TILT);
 const startZ = 12, rampLow = -14, rampHigh = -22, landZ = -50, WALL_Z = -32;
 export let duration = FAIL_LEN + WIN_LEN;
