@@ -6,17 +6,26 @@ Three.js scene → Playwright frame-by-frame capture → ffmpeg MP4 (+ optional 
 ## Use
 ```bash
 npm install
-npm run dev                       # preview at http://localhost:5173/?scenario=carJump&live
-npm run capture -- carJump 30 --vehicle=vehicle-motorcycle   # -> out/carJump-motorcycle.mp4
-npm run capture -- carJump 30 --music=music.mp3
-npm run batch                     # one video per vehicle (4 trucks + motorcycle)
+npm run dev                                   # preview: http://localhost:5173/?scenario=carJump&vehicle=car-kit/taxi&live
+npm run capture -- carJump 30 --vehicle=train-kit/train-diesel-a   # -> out/carJump-train_kit_train_diesel_a.mp4
+npm run capture -- carJump 30 --vehicle=car-kit/police --music=music.mp3
+npm run batch                                 # one video per vehicle in VEHICLES (src/vehicles.js)
+# gallery to browse models: ?scenario=lineup&vehicle=car-kit/sedan,car-kit/taxi,train-kit/train-tram-modern
 ```
+
+## Assets (all Kenney, CC0 — see License.txt in each folder)
+`public/models/<pack>/<file>.glb`, referenced as `<pack>/<file>`:
+- `car-kit` – cars, taxi, police, fire truck, tractor, karts… (also cones, boxes)
+- `toy-car-kit` – monster truck, racers + **ramps, loops, hills, bumps, coins, gates** (obstacle pieces!)
+- `train-kit` – locomotives, trams, carriages + railroad pieces
+- `racing-kit` – race cars, ramps, barriers, fences, tents, trees
+- `starter-kit` – motorcycle, trucks
 
 ## Add an episode
 Create `src/scenarios/<name>.js` exporting `duration` (seconds) and `setup(scene, camera)`
 that returns `update(t)`. Make everything a pure function of `t` so renders are deterministic.
-Vehicles: real CC0 models from Kenney's Racing Kit in `public/models` (4 trucks, 1 motorcycle), loaded by `loadVehicle()` in `src/vehicles.js`.
-To add more (planes, trains…), drop a `.glb` in `public/models`, add its name to `VEHICLES`. `planeHoops` still uses placeholder shapes.
+`loadVehicle(name)` in `src/vehicles.js` loads any model, scales it, and faces it toward -Z (per-pack facing is set there).
+`planeHoops` still uses placeholder shapes (no plane model yet).
 
 ## YouTube Kids notes
 Mark videos "made for kids". Vary scenarios/titles (templated mass-produced uploads risk demonetization).

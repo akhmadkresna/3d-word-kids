@@ -10,7 +10,7 @@ const [scenario = 'carJump', fpsArg = '30'] = process.argv.slice(2).filter((a) =
 const { vehicle = '', music } = flags;
 const fps = Number(fpsArg);
 fs.mkdirSync('out', { recursive: true });
-const outFile = `out/${scenario}${vehicle ? '-' + vehicle.replace('vehicle-', '') : ''}.mp4`;
+const outFile = `out/${scenario}${vehicle ? '-' + vehicle.replace(/^vehicle-/, '').replace(/[^a-z0-9]+/gi, '_').slice(0, 60) : ''}.mp4`;
 
 const server = await createServer({ logLevel: 'error', server: { port: 5199 } });
 await server.listen();

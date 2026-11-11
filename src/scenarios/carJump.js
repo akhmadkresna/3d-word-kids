@@ -5,7 +5,7 @@ export const duration = 8; // seconds
 
 // Deterministic: everything is a pure function of t (no real-time physics).
 export async function setup(scene, camera, opts = {}) {
-  const car = await loadVehicle(opts.vehicle || 'vehicle-truck-red'); scene.add(car);
+  const car = await loadVehicle(opts.vehicle || 'car-kit/sedan'); scene.add(car);
   const TILT = 0.28, T = Math.tan(TILT);
   // ramp: low end at z=-14 (ground), high end at z=-22
   const ramp = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.3, 8.3),

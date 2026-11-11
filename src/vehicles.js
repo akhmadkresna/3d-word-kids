@@ -40,9 +40,20 @@ export function makeHoop(color = 0xffeb3b) {
   return m;
 }
 
-// ---- Real CC0 models (Kenney) ----
-export const VEHICLES = ['vehicle-truck-red', 'vehicle-truck-yellow', 'vehicle-truck-green',
-  'vehicle-truck-purple', 'vehicle-motorcycle'];
+// ---- Real CC0 models (Kenney) in public/models/<pack>/<file>.glb ----
+// Name = "<pack>/<file>", e.g. "car-kit/sedan". Packs: car-kit, toy-car-kit, train-kit, racing-kit, starter-kit.
+export const VEHICLES = [
+  'car-kit/sedan', 'car-kit/taxi', 'car-kit/police', 'car-kit/firetruck', 'car-kit/ambulance',
+  'car-kit/garbage-truck', 'car-kit/tractor', 'car-kit/suv', 'car-kit/van', 'car-kit/race-future',
+  'toy-car-kit/vehicle-monster-truck', 'toy-car-kit/vehicle-speedster', 'toy-car-kit/vehicle-drag-racer',
+  'toy-car-kit/vehicle-suv', 'toy-car-kit/vehicle-vintage-racer',
+  'racing-kit/raceCarRed', 'racing-kit/raceCarGreen', 'racing-kit/raceCarOrange',
+  'train-kit/train-locomotive-a', 'train-kit/train-diesel-a', 'train-kit/train-electric-bullet-a',
+  'train-kit/train-tram-modern',
+  'starter-kit/vehicle-motorcycle', 'starter-kit/vehicle-truck-red', 'starter-kit/vehicle-truck-yellow',
+];
+// Packs whose models already face -Z (the others face +Z and get turned around).
+const FACES_MINUS_Z = ['toy-car-kit/'];
 const loader = new GLTFLoader();
 
 // Loads a glb, scales it to `length` units long, rests it on y=0 and faces it toward -Z.
@@ -56,8 +67,9 @@ export async function loadVehicle(name, length = 3.6) {
   box.setFromObject(model);
   const c = box.getCenter(new THREE.Vector3());
   model.position.set(-c.x, -box.min.y, -c.z);
-  model.rotation.y = Math.PI; // Kenney models face +Z; we drive toward -Z
-  model.position.x *= -1; model.position.z *= -1;
+  if (!FACES_MINUS_Z.some((p) => name.startsWith(p))) {
+    model.rotation.y = Math.PI; model.position.x *= -1; model.position.z *= -1;
+  }
   const g = new THREE.Group(); g.add(model);
   g.userData.wheels = [];
   model.traverse((o) => { if (/wheel/i.test(o.name)) g.userData.wheels.push(o); });
