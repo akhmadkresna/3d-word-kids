@@ -1,0 +1,28 @@
+{
+  "name": "3d-word-kids",
+  "version": "1.0.0",
+  "description": "3D kids video pipeline (Three.js + Playwright + ffmpeg).",
+  "scripts": {
+    "dev": "vite",
+    "capture": "node capture.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akhmadkresna/3d-word-kids.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/akhmadkresna/3d-word-kids/issues"
+  },
+  "homepage": "https://github.com/akhmadkresna/3d-word-kids#readme",
+  "dependencies": {
+    "three": "^0.187.0",
+    "vite": "^8.3.8"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.0"
+  },
+  "type": "module"
+}
