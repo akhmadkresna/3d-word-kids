@@ -1025,6 +1025,318 @@
   ]
  },
  {
+  "id": "train-kit/train-carriage-box",
+  "name": "Carriage Box Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.298,
+  "width": 1.2,
+  "bottom": 0,
+  "top": 1.298,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-coal",
+  "name": "Carriage Coal Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.646,
+  "width": 1.2,
+  "bottom": 0,
+  "top": 1.646,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-container-blue",
+  "name": "Carriage Container Blue Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.359,
+  "width": 1,
+  "bottom": 0,
+  "top": 1.359,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-container-green",
+  "name": "Carriage Container Green Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.359,
+  "width": 1,
+  "bottom": 0,
+  "top": 1.359,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-container-red",
+  "name": "Carriage Container Red Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.359,
+  "width": 1,
+  "bottom": 0,
+  "top": 1.359,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-dirt",
+  "name": "Carriage Dirt Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.646,
+  "width": 1.2,
+  "bottom": 0,
+  "top": 1.646,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-flatbed",
+  "name": "Carriage Flatbed Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.159,
+  "width": 1.1,
+  "bottom": 0,
+  "top": 1.159,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-flatbed-wood",
+  "name": "Carriage Flatbed Wood Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.159,
+  "width": 1.1,
+  "bottom": 0,
+  "top": 1.159,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-lumber",
+  "name": "Carriage Lumber Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.159,
+  "width": 1.1,
+  "bottom": 0,
+  "top": 1.159,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-tank",
+  "name": "Carriage Tank Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.752,
+  "width": 1.386,
+  "bottom": 0,
+  "top": 1.752,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-tank-large",
+  "name": "Carriage Tank Large Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.752,
+  "width": 1.386,
+  "bottom": 0,
+  "top": 1.752,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
+  "id": "train-kit/train-carriage-wood",
+  "name": "Carriage Wood Train",
+  "carriage": true,
+  "pack": "train-kit",
+  "facing": "+z",
+  "length": 2.7,
+  "height": 1.575,
+  "width": 1.2,
+  "bottom": 0,
+  "top": 1.575,
+  "axles": [
+   {
+    "x": -0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": -0.6
+   },
+   {
+    "x": 0.6,
+    "y": 0.359,
+    "r": 0.381,
+    "z": 0.6
+   }
+  ]
+ },
+ {
   "id": "train-kit/train-diesel-a",
   "name": "Diesel A Train",
   "pack": "train-kit",

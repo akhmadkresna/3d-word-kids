@@ -1,8 +1,10 @@
 // Physics for one stage + one vehicle. Pure planck (no DOM / three) so it also runs in Node for the bot tests.
 import * as planck from 'planck';
 import { GRAVITY, FLOAT, vehiclePhysics } from './vehicleClass.js';
+import SPECS from './vehicleSpecs.json' with { type: 'json' };
 
 const { World, Vec2, Box, Circle, Chain, Edge, WheelJoint, RevoluteJoint } = planck;
+const rot = (v, a) => new Vec2(v.x * Math.cos(a) - v.y * Math.sin(a), v.x * Math.sin(a) + v.y * Math.cos(a));
 const FRICTION = { grass: 0.9, boost: 1.0, spring: 0.9, ice: 0.05, mud: 1.1, rainbow: 1.0, shroom: 0.9, funk: 0.9, rumble: 1.0 };
 export const DT = 1 / 60;
 
@@ -31,7 +33,7 @@ export class Sim {
     this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.throttle = 0; this.cpIndex = 0; this.hint = false;
     this.collect = stage.collectibles.map((c) => ({ ...c, got: false })); this.starsGot = 0; this.starsTotal = this.collect.length;
     this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.loop = null; this.rumble = 0; this.airT = 0; this.groundT = 0; this.trick = null; this.flips = 0; this.bestAir = 0; this.props = []; this.maxX = 0;
-    this._buildTerrain(); this._buildProps(); this._buildCar(); this.reset(true);
+    this._buildTerrain(); this._buildProps(); this._buildCar(); this._buildWagons(); this.reset(true);
   }
 
   _buildTerrain() {
@@ -93,6 +95,51 @@ export class Sim {
     this.inertia = this.chassis.getInertia();
   }
 
+  // ---- train wagons: coupled behind the locomotive with limited-angle hinges; unpowered, they just roll ----
+  _makeBodies(vp, motor) {
+    const w = this.world, c = vp.chassis;
+    const chassis = w.createBody({ type: 'dynamic', position: new Vec2(0, 5), angularDamping: 0.4 });
+    chassis.createFixture(new Box(c.hx, (c.y1 - c.y0) / 2, new Vec2(0, (c.y1 + c.y0) / 2), 0), { density: vp.density, friction: 0.3, restitution: 0.05 }).setUserData('chassis');
+    const md = { mass: 0, center: new Vec2(0, 0), I: 0 }; chassis.getMassData(md);
+    md.center = new Vec2(0, c.y0 + (c.y1 - c.y0) * 0.1); md.I = Math.max(md.I, md.mass * 0.5); chassis.setMassData(md);
+    const wheels = vp.axles.map((a) => {
+      const b = w.createBody({ type: 'dynamic', position: new Vec2(a.x, 5 + a.y) });
+      b.createFixture(new Circle(a.r), { density: vp.density * 0.6, friction: vp.grip, restitution: 0.28 }).setUserData('wheel');
+      const j = w.createJoint(new WheelJoint({ motorSpeed: 0, maxMotorTorque: 0, enableMotor: motor, frequencyHz: vp.freq, dampingRatio: vp.damp }, chassis, b, b.getPosition(), new Vec2(0, 1)));
+      return { body: b, joint: j, r: a.r, off: a };
+    });
+    return { chassis, wheels };
+  }
+  _buildWagons() {
+    this.wagons = []; const ids = this.stage.def.wagons || []; if (!ids.length) return;
+    let prev = { body: this.chassis, hxFull: (this.spec.length * this.vp.scale) / 2, yA: this.vp.axles[0].y + 0.3, rearAnchor: null };
+    prev.rearAnchor = new Vec2(-prev.hxFull, prev.yA);
+    let totalMass = this.mass;
+    for (const id of ids) {
+      const wspec = SPECS.find((v) => v.id === id), wvp = vehiclePhysics(wspec, this.vp.scale), hxFull = (wspec.length * wvp.scale) / 2, yA = wvp.axles[0].y + 0.3;
+      const { chassis, wheels } = this._makeBodies({ ...wvp, density: wvp.density * 0.7 }, false);
+      const aFront = new Vec2(hxFull + 0.25, yA); // the coupling gap is 0.25 m
+      const pp = prev.body.getPosition(), anchorW = new Vec2(pp.x + prev.rearAnchor.x, pp.y + prev.rearAnchor.y);
+      chassis.setTransform(new Vec2(anchorW.x - aFront.x, anchorW.y - aFront.y), 0);
+      for (const wh of wheels) wh.body.setTransform(new Vec2(chassis.getPosition().x + wh.off.x, chassis.getPosition().y + wh.off.y), 0);
+      this.world.createJoint(new RevoluteJoint({ enableLimit: true, lowerAngle: -0.6, upperAngle: 0.6 }, prev.body, chassis, anchorW));
+      const wag = { chassis, wheels, vp: wvp, aFront, prevAnchor: prev.rearAnchor, prevBody: prev.body, spec: wspec };
+      this.wagons.push(wag); totalMass += chassis.getMass() + wheels.reduce((a, x) => a + x.body.getMass(), 0);
+      prev = { body: chassis, hxFull, yA, rearAnchor: new Vec2(-hxFull, yA) };
+    }
+    // the locomotive has to pull everything: scale its drive torque with the whole train's weight
+    this.torque = (totalMass * GRAVITY * 0.55 * this.vp.torque * 0.8) / this.wheels.length;
+  }
+  _placeWagons() { // lay the wagons out in a straight line behind the locomotive (spawn / respawn)
+    for (const w of this.wagons) {
+      const pb = w.prevBody, pa = pb.getAngle(), pp = pb.getPosition(), anchor = rot(w.prevAnchor, pa), aw = new Vec2(pp.x + anchor.x, pp.y + anchor.y), off = rot(w.aFront, pa);
+      w.chassis.setTransform(new Vec2(aw.x - off.x, aw.y - off.y), pa);
+      const cp = w.chassis.getPosition();
+      for (const wh of w.wheels) { const o = rot(wh.off, pa); wh.body.setTransform(new Vec2(cp.x + o.x, cp.y + o.y), 0); wh.body.setLinearVelocity(new Vec2(0, 0)); wh.body.setAngularVelocity(0); }
+      w.chassis.setLinearVelocity(new Vec2(0, 0)); w.chassis.setAngularVelocity(0);
+    }
+  }
+
   _spawnPose(cp) {
     const vp = this.vp, gx = (x) => this.stage.groundY(x);
     let y = -1e9;
@@ -109,6 +156,7 @@ export class Sim {
       const o = wh.off; wh.body.setTransform(new Vec2(p.x + o.x * ca - o.y * sa, p.y + o.x * sa + o.y * ca), 0);
       wh.body.setLinearVelocity(new Vec2(0, 0)); wh.body.setAngularVelocity(0);
     }
+    if (this.wagons.length) this._placeWagons();
     if (this.loop) { this._setDynamic(); this.loop = null; }
     this.trick = null; this.airT = 0;
     this.damage = 0; // a reset / respawn repairs the vehicle
@@ -152,7 +200,7 @@ export class Sim {
       this.airT = 0;
     }
     // take-off: plan a flip if there is enough air time ahead
-    if (this.airT > 0.12 && wasAir <= 0.12 && !this.trick && this.groundT === 0) {
+    if (this.airT > 0.12 && wasAir <= 0.12 && !this.trick && this.groundT === 0 && !this.wagons.length) {
       const tl = this._predictLanding();
       if (tl && tl > 1.15) {
         const flips = tl > 2.5 ? 2 : 1, dur = flips === 1 ? 0.85 : 1.5;
@@ -174,7 +222,7 @@ export class Sim {
   }
 
   // ---- scripted vertical loop: the vehicle rides the ring on rails (2D physics cannot cross its own track) ----
-  _bodies() { return [this.chassis, ...this.wheels.map((w) => w.body)]; }
+  _bodies() { return [this.chassis, ...this.wheels.map((w) => w.body), ...this.wagons.flatMap((g) => [g.chassis, ...g.wheels.map((w) => w.body)])]; }
   _setDynamic() { for (const b of this._bodies()) b.setDynamic(); }
   _startLoop(l, speed) {
     const h = this.vp.axles.reduce((a, q) => a + (q.r - q.y), 0) / this.vp.axles.length; // chassis centre height above the track surface
@@ -239,10 +287,10 @@ export class Sim {
       if (!inPad) continue;
       if (pad.type === 'boost' && wantGas) { this.boostT = 1.1; this.chassis.applyForceToCenter(new Vec2(Math.cos(ang) * this.mass * 22, Math.sin(ang) * this.mass * 22)); if (!was) this.events.push({ type: 'boost', x: pos.x, y: pos.y }); }
       else if (pad.type === 'boost' && !was) this.events.push({ type: 'boost', x: pos.x, y: pos.y });
-      if (pad.type === 'spring' && !was) { for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.05, Math.max(b.getLinearVelocity().y, 0) + 17)); this.events.push({ type: 'spring', x: pos.x, y: pos.y }); }
+      if (pad.type === 'spring' && !was) { for (const b of this._bodies()) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.05, Math.max(b.getLinearVelocity().y, 0) + 17)); this.events.push({ type: 'spring', x: pos.x, y: pos.y }); }
       if (pad.type === 'shroom' && !was) { for (const b of this._bodies()) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.04, Math.max(b.getLinearVelocity().y, 0) + 20)); this.events.push({ type: 'shroom', x: pos.x, y: pos.y }); }
       if (pad.type === 'catapult' && !was) { for (const b of this._bodies()) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.08, Math.max(b.getLinearVelocity().y, 0) + 12.5)); this.events.push({ type: 'catapult', x: pos.x, y: pos.y }); }
-      if (pad.type === 'mud') for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) { const v = b.getLinearVelocity(); b.setLinearVelocity(new Vec2(v.x * 0.985, v.y)); }
+      if (pad.type === 'mud') for (const b of this._bodies()) { const v = b.getLinearVelocity(); b.setLinearVelocity(new Vec2(v.x * 0.985, v.y)); }
     }
 
     // floaty: reduced gravity while airborne (everything stays in flight longer)
@@ -261,7 +309,7 @@ export class Sim {
       const hit = Math.min(0.35, (dv - 2) / 45); this.damage = Math.min(1, this.damage + hit); this.lastHit = this.time;
       this.events.push({ type: 'bump', power: Math.min(1, dv / 22), hit, damage: this.damage, dvx, dvy, x: pos.x, y: pos.y });
     }
-    for (const l of this.stage.loops) { // fast enough at the foot of a ring -> ride the loop
+    if (!this.wagons.length) for (const l of this.stage.loops) { // (trains are too long for loops) fast enough at the foot of a ring -> ride the loop
       if (pos.x > l.x0 - 0.8 && pos.x < l.x0 + 1.6 && Math.abs(pos.y - (l.y + 1.3)) < 2.4 && v2.x > 7) { this._startLoop(l, v2.x); return; }
     }
     this.prevV = new Vec2(v2.x, v2.y);
@@ -292,6 +340,7 @@ export class Sim {
     return {
       x: p.x, y: p.y, a: this.chassis.getAngle(), dead: this.dead, hint: this.hint,
       wheels: this.wheels.map((w) => { const q = w.body.getPosition(); return { x: q.x, y: q.y, a: w.body.getAngle() }; }),
+      wagons: this.wagons.map((g) => { const q = g.chassis.getPosition(); return { x: q.x, y: q.y, a: g.chassis.getAngle(), wheels: g.wheels.map((w) => { const r = w.body.getPosition(); return { x: r.x, y: r.y, a: w.body.getAngle() }; }) }; }),
     };
   }
 }

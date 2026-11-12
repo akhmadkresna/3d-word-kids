@@ -1,5 +1,15 @@
 // Turns a stage definition (a list of segments) into terrain + props. Pure data, no rendering/physics.
 // Coordinates: x forward, y up, metres.
+import SPECS from './vehicleSpecs.json' with { type: 'json' };
+import { classify } from './vehicleClass.js';
+
+/** metres of track a train's wagons need behind the locomotive (0 for ordinary vehicles) */
+export function trainLength(def) {
+  if (!def.wagons || !def.wagons.length) return 0;
+  const loco = SPECS.find((v) => v.id === def.vehicle), sc = classify(loco).len / loco.length;
+  return Math.ceil(def.wagons.reduce((a, id) => a + SPECS.find((v) => v.id === id).length * sc + 0.4, 0) + 2);
+}
+
 export function mulberry32(a) {
   return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
@@ -97,8 +107,9 @@ export function buildStage(def) {
     },
     rampTrain: (s) => { // launch ramps back to back: each one throws the vehicle across a long flat landing zone into the next ramp
       for (let i = 0; i < s.n; i++) {
-        flat(i ? s.land : s.runup); profile(s.rampLen, (t) => s.rise * t); const lx = x, ly = y; push(x, y - s.rise); // cliff right behind the lip
-        starArc(lx, ly, lx + s.land * 0.9, ly - s.rise, 4.5 + s.rise, 6);
+        flat(i ? s.land : s.runup); profile(s.rampLen, (t) => s.rise * t); const lx = x, ly = y;
+        if (s.gap) pit(s.gap, -s.rise); else push(x, y - s.rise); // a water gap (fall in = splash) or just a cliff right behind the lip
+        starArc(lx, ly, lx + (s.gap || 0) + s.land * 0.9, ly - s.rise, 4.5 + s.rise, 6);
       }
       flat(s.land);
     },
@@ -147,8 +158,11 @@ export function buildStage(def) {
     mud: (s) => { flat(2); S.pads.push({ type: 'mud', x0: x, x1: x + s.len, y }); flat(s.len, 'mud'); flat(2); },
   };
 
-  if (def.dropIn) { flat(9); profile(16, (t) => -7 * sm(t)); flat(6); } // start on a platform and roll down a slope: speed from the first second
-  else flat(20); // start area
+  // trains: the start platform must hold the locomotive AND every wagon behind it
+  const extra = trainLength(def);
+  S.trainExtra = extra;
+  if (def.dropIn) { flat(9 + extra); profile(16, (t) => -7 * sm(t)); flat(6); } // start on a platform and roll down a slope: speed from the first second
+  else flat(20 + extra); // start area
   for (const seg of def.segs) {
     const x0 = x; SEG[seg.t](seg); checkpoint();
     if (seg.t !== 'flat') { starLine(x0 + 3, x - 3); if (crng() < 0.7 && seg.t !== 'ferry') balloons(x0 + 4, x - 4, 3 + Math.floor(crng() * 3)); }
@@ -178,8 +192,11 @@ export function buildStage(def) {
   const starIdx = S.collectibles.map((c, i) => (c.type === 'star' ? i : -1)).filter((i) => i >= 0);
   if (starIdx.length > 85) { const drop = new Set(); const stepK = starIdx.length / 85; let acc = 0; starIdx.forEach((i) => { acc += 1; if (acc >= stepK) acc -= stepK; else drop.add(i); }); S.collectibles = S.collectibles.filter((c, i) => !drop.has(i)); }
   S.collectibles.sort((a, b) => a.x - b.x);
-  S.start = { x: 7, y: S.groundY(7) };
-  S.checkpoints.unshift({ x: 7, y: S.start.y });
+  S.start = { x: 7 + extra, y: S.groundY(7 + extra) };
+  if (extra) { // a train needs continuous, fairly level ground behind the checkpoint for its wagons
+    S.checkpoints = S.checkpoints.filter((c) => { for (let px = c.x - extra; px <= c.x + 1; px += 1) { const g = S.groundY(px); if (g == null || Math.abs(g - c.y) > 1.6) return false; } return true; });
+  }
+  S.checkpoints.unshift({ x: 7 + extra, y: S.start.y });
   S.finishX = finishX; S.length = x;
   S.minY = Math.min(...S.pieces.flatMap((p) => p.pts.map((q) => q[1])));
   S.deathY = S.minY - 45;

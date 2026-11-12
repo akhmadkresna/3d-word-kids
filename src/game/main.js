@@ -90,6 +90,14 @@ $('muteBtn').onclick = () => { audio.start(); audio.setMuted(!audio.muted); $('m
 $('musicBtn').onclick = () => { audio.start(); audio.setMusic(!audio.musicOn); $('musicBtn').textContent = `🎵 Music: ${audio.musicOn ? 'on' : 'off'}`; };
 $('resetProgress').onclick = () => { if (confirm('Clear all stars and best times?')) { save.stars = {}; save.best = {}; persist(); buildMenu(); } };
 
+// ---------- day / night switch ----------
+const TODS = ['auto', 'day', 'night'], TOD_ICON = { auto: '🌗', day: '☀️', night: '🌙' }, TOD_NAME = { auto: 'each stage has its own look', day: 'always day', night: 'always night' };
+let tod = params.get('tod') || (() => { try { return localStorage.getItem('vroom-tod'); } catch { return null; } })() || 'auto';
+if (!TODS.includes(tod)) tod = 'auto';
+function applyTod() { view.setTimeOfDay(tod); $('todBtn').textContent = TOD_ICON[tod]; $('todBtn').title = `Day / night: ${TOD_NAME[tod]} (tap to change)`; try { localStorage.setItem('vroom-tod', tod); } catch {} }
+view.tod = tod; $('todBtn').textContent = TOD_ICON[tod];
+$('todBtn').onclick = () => { audio.start(); tod = TODS[(TODS.indexOf(tod) + 1) % TODS.length]; applyTod(); setMsg(''); };
+
 // ---------- stages ----------
 async function startDef(def) {
   curDef = def; k = def.k; const token = ++loadToken, spec = specById[def.vehicle], vp = vehiclePhysics(spec);
@@ -98,13 +106,13 @@ async function startDef(def) {
   try { await view.loadStage(stage, spec, vp); } catch (e) { console.error(e); $('loading').textContent = 'Could not load: ' + e.message; return; }
   if (token !== loadToken) return;
   for (let i = 0; i < 30; i++) sim.step(false); // let the suspension settle
-  sim.events.length = 0; sim.time = 0; sim.damage = 0;
+  sim.events.length = 0; sim.time = 0; sim.damage = 0; view.resetCapture(sim);
   if (!recMode) { normalK = k; location.hash = String(k); try { localStorage.setItem(SAVE + '-last', String(k)); } catch {} }
   $('stageNum').textContent = recMode ? `🎬 Mix · level ${k}` : `Stage ${k}`; $('vehName').textContent = spec.name; hintShown = false;
   $('timeBest').textContent = !recMode && save.best[k] ? `Best ${fmt(save.best[k])}` : `Par ${fmt(def.par)}`;
   $('loading').style.display = 'none'; state = 'ready';
   setMsg(`${spec.name}<small>Hold <b>GAS</b> to go! · ${def.length} m${recMode ? '' : '<br>☰ Stages (top right) = pick any stage'}</small>`);
-  view.cam.x = stage.start.x + 4;
+  view.cam.x = stage.start.x + 4 - (stage.trainExtra || 0) * 0.5;
 }
 const startStage = (n) => { recMode = false; document.body.classList.remove('rec'); return startDef(STAGES[Math.max(1, Math.min(STAGES.length, n)) - 1]); };
 function restartStage() { return startDef(curDef); }
@@ -154,7 +162,7 @@ function frame(tms) {
     acc += dt;
     let steps = 0;
     while (acc >= DT && steps < 6) {
-      sim.step(state === 'playing' || state === 'finished' ? gasHeld() : false);
+      sim.step(state === 'playing' || state === 'finished' ? gasHeld() : false); view.capture(sim);
       acc -= DT; steps++;
       for (const e of sim.events) {
         audio.play(e); view.event(e, now);
@@ -167,7 +175,7 @@ function frame(tms) {
       sim.events.length = 0;
     }
     if (acc > DT * 6) acc = 0;
-    view.update(sim, now, dt);
+    view.update(sim, now, dt, params.has('nointerp') ? 1 : Math.min(1, acc / DT));
     audio.engine(sim.throttle, sim.speed, !sim.dead, sim.damage); audio.rumble(sim.rumble || 0);
     $('flipNow').textContent = sim.flips; $('starNow').textContent = sim.starsGot; $('starTot').textContent = sim.starsTotal;
     $('dmgFill').style.width = `${Math.round(sim.damage * 100)}%`; $('dmgFill').style.background = `hsl(${Math.round(120 - 120 * sim.damage)},80%,55%)`;

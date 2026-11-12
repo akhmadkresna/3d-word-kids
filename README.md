@@ -20,6 +20,16 @@ Kids got bored fast on long calm tracks and loved **ramps that fling the car and
 - ⭐ stars and 🎈 balloons along the way, cheering animals, loops, rainbow bridges, tunnels, mushrooms.
 `npm run` / `node tools/fun-metrics.mjs` measures it: airtime went from 24 % to 52 %, big jumps (>0.8 s) from 4 to ~11 per minute, longest calm stretch from 2.6 s to 1.3 s.
 
+## Trains pull wagons (gerbong)
+Every train (diesel, locomotive, electric, tram) pulls 2-4 coupled wagons (box, coal, tanker, container, flatbed, lumber…). Each wagon is its own physics body with its own wheels on a limited-angle hinge, so the train bends over bumps and flies over gaps as one. The start platform is lengthened to hold the whole train, trains skip loops/ferries/seesaws (too long), and the camera pulls back to frame the full train.
+
+## Cliff gaps (fall in the water!)
+About 70 % of ramp trains launch you over a **water gap** sized to 50-78 % of what that vehicle can fly, plus ramp-jump cliffs elsewhere (84 of 100 stages have at least one, ~3 per stage on average, up to 30 m wide). Too slow = splash and respawn at the checkpoint.
+
+## Looks: crisp + day/night
+Palette textures use nearest-texel sampling, the game renders at up to 2x pixel ratio (and drops resolution only if the device cannot keep up), the 60 Hz physics is interpolated to the screen frame rate, and shadows move in whole texels, so the vehicle stays sharp while moving.
+The **🌗 button** (top bar) cycles **auto** (each stage keeps its own look) → **☀️ day** → **🌙 night** (stars, moon, headlights); it applies instantly and is remembered. URL `?tod=night` also works.
+
 ## Showpieces and friends
 - **Cheering animals** (bunny, chick, bear, frog, sheep, pig) stand along every track and a crowd waits at the finish; they jump, wave and squeak as the vehicle passes.
 - **Loop-the-loop:** hit the boost pad, then ride the striped ring (it is a scripted "magic" loop, so it always works).

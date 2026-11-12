@@ -1,6 +1,7 @@
 // Procedural stage definitions. Obstacles scale with each vehicle's wheel size + speed and with stage number.
-import { mulberry32 } from './terrain.js';
-import { vehiclePhysics, GRAVITY } from './vehicleClass.js';
+import { mulberry32, trainLength } from './terrain.js';
+import SPECS from './vehicleSpecs.json' with { type: 'json' };
+import { vehiclePhysics, GRAVITY, FLOAT } from './vehicleClass.js';
 
 export const THEMES = ['meadow', 'desert', 'snow', 'sunset', 'candy', 'night'];
 const UNLOCK = { hills: 1, bumps: 1, jump: 1, mountain: 1, rampTrain: 1, bumpfield: 1, washboard: 2, roller: 3, shrooms: 3, tunnel: 4, skijump: 5, rainbow: 6, loop: 7, boost: 2, slope: 4, crates: 6, drop: 8, funk: 4, whoops: 5, launcher: 8, barrels: 8, boostjump: 12, pins: 14, balls: 16, logs: 18, ice: 20, ferry: 20, seesaw: 24, spring: 28, steps: 30, mud: 34 };
@@ -18,7 +19,7 @@ export function segLength(s) {
     case 'ferry': return s.runup + s.w + 14;
     case 'drop': return s.len + s.h * 4.5 + 10;
     case 'mountain': return 10 + s.up + s.plateau + s.down + 4;
-    case 'rampTrain': return s.runup + s.n * (s.rampLen + s.land) + s.land - s.land * 0 ;
+    case 'rampTrain': return s.runup + s.n * (s.rampLen + (s.gap || 0) + s.land) + s.land;
     case 'bumpfield': return s.ws.reduce((a, b) => a + b, 0) + 3;
     case 'skijump': return s.runup + s.rampLen + 12 + (s.drop - s.rise) * 4.5 + 4;
     case 'roller': return s.n * s.w + 3;
@@ -59,6 +60,15 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
   weights.mountain = 0.35; if (weights.loop) weights.loop = 1.6; if (weights.rainbow) weights.rainbow = 1.6; if (weights.tunnel) weights.tunnel = 1.2; if (weights.shrooms) weights.shrooms = 1.6;
   for (const t of ['funk', 'washboard', 'whoops', 'launcher']) if (weights[t]) weights[t] = 2.2; // the bumpy, flying and shaking obstacles are favourites if (weights.roller) weights.roller = 2.5; if (weights.skijump) weights.skijump = 2;
   for (const t of opts.avoid || []) if (weights[t] && t !== 'jump') weights[t] *= 0.3;
+  // trains pull 2-4 wagons (gerbong). They are too long for loops, ferries and seesaws.
+  const isTrain = /train/.test(spec.id) && !spec.carriage;
+  let wagons = [];
+  if (isTrain) {
+    const pool = SPECS.filter((v) => v.carriage).map((v) => v.id), n = 2 + Math.floor(rnd() * 3);
+    for (let i = 0; i < n; i++) wagons.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]);
+    for (const t of ['loop', 'ferry', 'seesaw']) delete weights[t];
+  }
+  const trainLen = trainLength({ vehicle: spec.id, wagons });
   const pick = () => { const tot = Object.values(weights).reduce((a, b) => a + b, 0); let x = rnd() * tot; for (const [t, w] of Object.entries(weights)) { if ((x -= w) <= 0) return t; } return 'hills'; };
 
   const g = {
@@ -93,8 +103,10 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
       return { t: 'skijump', runup: +lerp(28, 36, rnd()).toFixed(1), rampLen: +(rise / 0.55).toFixed(1), rise, drop };
     },
     rampTrain() { // launch ramps back to back; the landing zone is sized to how far this vehicle flies
-      const rise = +(lerp(2.8, 4.8, d) * (0.85 + rnd() * 0.3)).toFixed(1), land = +Math.max(30, Math.min(46, vp.top * 1.7)).toFixed(0);
-      return { t: 'rampTrain', n: 2 + Math.floor(d * 2.4 + rnd() * 0.8), runup: 16, rampLen: +(rise / 0.55).toFixed(1), rise, land };
+      const rise = +(lerp(2.8, 4.8, d) * (0.85 + rnd() * 0.3)).toFixed(1), land = +Math.max(30, Math.min(46, vp.top * 1.7), trainLen + 14).toFixed(0);
+      // CLIFF GAPS: about 70 % of ramp trains launch over a water gap (fall in = splash + respawn); the gap is 50-78 % of this vehicle's flight distance
+      const v = vp.top * 0.85, range = (v * v * Math.sin(2 * Math.atan(0.55))) / (GRAVITY * (1 - FLOAT)), gap = rnd() < 0.7 ? +Math.max(7, Math.min(30, range * lerp(0.5, 0.78, d))).toFixed(1) : 0;
+      return { t: 'rampTrain', n: 2 + Math.floor(d * 2.4 + rnd() * 0.8), runup: 16, rampLen: +(rise / 0.55).toFixed(1), rise, land, gap };
     },
     bumpfield() { // 10-16 big bouncy bumps, heights limited by wheel size and bump width
       const n = 10 + Math.floor(rnd() * 5 + d * 4), ws = [], hs = [];
@@ -127,11 +139,11 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
 
   const segs = []; let total = 16 + 16 + 6, drift = 0, last = '', featureCount = 0;
   // PACE: no flat filler. Every stage = a RAMP TRAIN (flying!) + a BUMP FIELD (bouncing!) + one showpiece or favourite bumpy obstacle.
-  const showpieces = ['shrooms', 'tunnel', 'rainbow', 'loop'].filter((t) => UNLOCK[t] <= k);
+  const showpieces = ['shrooms', 'tunnel', 'rainbow', 'loop'].filter((t) => UNLOCK[t] <= k && !(isTrain && t === 'loop'));
   const bumpy = ['washboard', 'funk', 'whoops', 'launcher', 'jump'].filter((t) => weights[t]);
   const classics = Object.keys(weights).filter((t) => !['jump', 'mountain', 'shrooms', 'tunnel', 'rainbow', 'loop', 'hills', 'slope', 'rampTrain', 'bumpfield'].includes(t));
   const third = rnd() < 0.55 && showpieces.length ? showpieces[Math.floor(rnd() * showpieces.length)] : bumpy[Math.floor(rnd() * bumpy.length)];
-  const fourth = classics.length && !opts.maxLen && rnd() < 0.6 ? classics[Math.floor(rnd() * classics.length)] : null;
+  const fourth = !opts.maxLen && rnd() < 0.7 ? (rnd() < 0.5 ? 'jump' : classics.length ? classics[Math.floor(rnd() * classics.length)] : null) : null; // 'jump' = ramp over a water gap (a cliff you can fall off)
   const forced = ['rampTrain', 'bumpfield', third, ...(fourth ? [fourth] : [])];
   if (rnd() < 0.5) { const t = forced[0]; forced[0] = forced[1]; forced[1] = t; }
   while (total < target || featureCount < forced.length) {
@@ -148,5 +160,5 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
   }
   // pull the stage back to roughly its starting height so it never drifts off screen
   if (Math.abs(drift) > 3) segs.push({ t: 'slope', len: Math.min(80, Math.abs(drift) * 4 + 12), dy: -drift });
-  return { k, vehicle: spec.id, theme, seed, attempt, boss, dropIn: true, segs, expectedLength: Math.round(total) };
+  return { k, vehicle: spec.id, theme, seed, attempt, boss, dropIn: true, ...(wagons.length ? { wagons } : {}), segs, expectedLength: Math.round(total) };
 }

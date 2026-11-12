@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { loadModel } from '../vehicles.js';
 import { createSplash, createSmoke, createConfetti } from '../fx.js';
 import { mulberry32 } from './terrain.js';
+import { vehiclePhysics } from './vehicleClass.js';
+import SPECS from './vehicleSpecs.json';
 
 const DEPTH = 7; // terrain thickness (z from -3.5 to +3.5)
 
@@ -13,6 +15,16 @@ export const THEME_STYLE = {
   candy: { lolli: true, top: 0xff8fd0, hor: 0xffe6f2, grass: 0x7be0c3, dirt: 0xd96aa7, hill: 0xb48cff, cloud: 0xffffff, sun: 0xfff0f8, sunI: 2.2, hemi: 1.1, trees: ['racing-kit/treeSmall', 'toy-car-kit/tree'], tint: 0xff9ad0 },
   night: { top: 0x0b1030, hor: 0x2e3f86, grass: 0x2f6b3a, dirt: 0x4a3a2a, hill: 0x1e3a55, cloud: 0x6f7fb5, sun: 0xaabbff, sunI: 1.5, hemi: 1.15, trees: ['toy-car-kit/tree-pine', 'racing-kit/treeLarge'], tint: 0x6f9f7f, stars: true },
 };
+const DAY_LIGHT = { top: 0x3a8fe0, hor: 0xcfe9ff, sun: 0xfff2d8, sunI: 2.3, hemi: 1.0, cloud: 0xffffff, stars: false };
+const NIGHT_LIGHT = { top: 0x0b1030, hor: 0x2e3f86, sun: 0xaabbff, sunI: 1.5, hemi: 1.15, cloud: 0x6f7fb5, stars: true };
+const dim = (hex, k) => new THREE.Color(hex).multiplyScalar(k).getHex();
+/** lighting + ground colours for a stage theme under a time-of-day override ('auto' keeps the theme's own look) */
+export function lookFor(themeName, mode) {
+  const base = THEME_STYLE[themeName] || THEME_STYLE.meadow, look = { ...base };
+  if (mode === 'day') { Object.assign(look, DAY_LIGHT); if (themeName === 'night' || themeName === 'sunset') { const m = THEME_STYLE.meadow; look.grass = m.grass; look.dirt = m.dirt; look.hill = m.hill; } }
+  else if (mode === 'night') { Object.assign(look, NIGHT_LIGHT); if (themeName !== 'night') { look.grass = dim(base.grass, 0.4); look.dirt = dim(base.dirt, 0.4); look.hill = dim(base.hill, 0.42); } }
+  return look;
+}
 const SURFACE = { ice: 0xa6e6ff, mud: 0x5b3b22, boost: 0x39d96b, spring: 0xff5a5a };
 
 function skyDome(top, hor) {
@@ -34,7 +46,8 @@ export class GameView {
   constructor(container) {
     this.container = container;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    this.maxPR = Math.min(window.devicePixelRatio || 1, 2); this.pr = this.maxPR; this.fpsEma = 1 / 60; this.prCool = 3; // crisp by default; drops resolution only if the device cannot keep up
+    this.renderer.setPixelRatio(this.pr); this.tod = 'auto';
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.05;
     container.appendChild(this.renderer.domElement);
@@ -50,10 +63,43 @@ export class GameView {
     this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
   }
 
+  /** dynamic resolution: full sharpness while the frame rate holds, step down if it does not, step back up when it recovers */
+  _adaptRes(dt) {
+    this.fpsEma += (Math.min(dt, 0.1) - this.fpsEma) * 0.05; this.prCool -= dt;
+    if (this.prCool > 0) return;
+    if (this.fpsEma > 0.026 && this.pr > 1) { this.pr = Math.max(1, this.pr - 0.25); this.renderer.setPixelRatio(this.pr); this.resize(); this.prCool = 3; }
+    else if (this.fpsEma < 0.0185 && this.pr < this.maxPR) { this.pr = Math.min(this.maxPR, this.pr + 0.25); this.renderer.setPixelRatio(this.pr); this.resize(); this.prCool = 5; }
+  }
+
+  // ---- smooth motion: physics runs at a fixed 60 Hz; the screen shows a blend of the last two physics states ----
+  _grab(sim) {
+    const p = sim.chassis.getPosition(), props = new Float32Array(sim.props.length * 3);
+    sim.props.forEach((q, i) => { const b = q.body.getPosition(); props[i * 3] = b.x; props[i * 3 + 1] = b.y; props[i * 3 + 2] = q.body.getAngle(); });
+    return { x: p.x, y: p.y, a: sim.chassis.getAngle(), wheels: sim.wheels.map((w) => { const q = w.body.getPosition(); return { x: q.x, y: q.y, a: w.body.getAngle() }; }), wagons: sim.wagons.map((g) => { const q = g.chassis.getPosition(); return { x: q.x, y: q.y, a: g.chassis.getAngle(), wheels: g.wheels.map((w) => { const r = w.body.getPosition(); return { x: r.x, y: r.y, a: w.body.getAngle() }; }) }; }), props };
+  }
+  capture(sim) { const g = this._grab(sim); this.prev = this.cur && Math.hypot(g.x - this.cur.x, g.y - this.cur.y) < 4 ? this.cur : g; this.cur = g; }
+  resetCapture(sim) { this.cur = this.prev = this._grab(sim); }
+  _interp(sim, alpha) {
+    const A = this.prev, B = this.cur; if (!A || !B) return { ...sim.snapshot(), props: null };
+    const L = (a, b) => a + (b - a) * alpha, La = (a, b) => { let d = b - a; d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI; return a + d * alpha; };
+    return { x: L(A.x, B.x), y: L(A.y, B.y), a: La(A.a, B.a), dead: sim.dead, hint: sim.hint, wheels: B.wheels.map((w, i) => ({ x: L(A.wheels[i].x, w.x), y: L(A.wheels[i].y, w.y), a: La(A.wheels[i].a, w.a) })), wagons: (B.wagons || []).map((w, i) => { const a = (A.wagons && A.wagons[i]) || w; return { x: L(a.x, w.x), y: L(a.y, w.y), a: La(a.a, w.a), wheels: w.wheels.map((q, j) => ({ x: L(a.wheels[j].x, q.x), y: L(a.wheels[j].y, q.y), a: La(a.wheels[j].a, q.a) })) }; }), props: A.props.length === B.props.length ? { A: A.props, B: B.props, alpha } : null };
+  }
+
+  /** day / night switch ('auto' = each stage's own look). Applies instantly, no reload. */
+  setTimeOfDay(mode) {
+    this.tod = mode; if (!this.stage) return;
+    const L = this.look = this.style = lookFor(this.stage.def.theme, mode), sc = this.scene;
+    sc.background.setHex(L.hor); sc.fog.color.setHex(L.hor);
+    this.sky.material.uniforms.top.value.setHex(L.top); this.sky.material.uniforms.hor.value.setHex(L.hor);
+    this.hemi.color.setHex(L.top); this.hemi.groundColor.setHex(L.grass); this.sun.color.setHex(L.sun);
+    this.cloudMat.color.setHex(L.cloud); this.hillMat.color.setHex(L.hill); this.dirtMat.color.setHex(L.dirt); if (this.surfMats.grass) this.surfMats.grass.color.setHex(L.grass);
+    this.stars.visible = !!L.stars; this.moon.visible = !!L.stars;
+  }
+
   clearStage() {
     this.stageGroup.traverse((o) => { if (o.geometry && !o.userData.shared) o.geometry.dispose(); if (o.material && o.userData.ownMat) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose()); });
     this.scene.remove(this.stageGroup); this.stageGroup = new THREE.Group(); this.scene.add(this.stageGroup);
-    for (const o of [this.sky, this.clouds, this.hills, this.stars, this.sun, this.hemi, this.headlight]) if (o) this.scene.remove(o);
+    for (const o of [this.sky, this.clouds, this.hills, this.stars, this.sun, this.hemi, this.headlight, this.headGlow]) if (o) this.scene.remove(o);
     if (this.confetti) { this.scene.remove(this.confetti.mesh); this.confetti = null; }
     for (const f of this.fxObjs || []) f.root.forEach((o) => this.scene.remove(o));
     this.fxObjs = []; this.running = [];
@@ -61,10 +107,11 @@ export class GameView {
 
   async loadStage(stage, spec, vp) {
     this.clearStage();
-    const style = THEME_STYLE[stage.def.theme] || THEME_STYLE.meadow, scene = this.scene, G = this.stageGroup;
-    this.style = style; this.stage = stage; this.spec = spec; this.vp = vp;
+    const style = lookFor(stage.def.theme, this.tod), scene = this.scene, G = this.stageGroup;
+    this.style = style; this.look = style; this.stage = stage; this.spec = spec; this.vp = vp;
     scene.background = new THREE.Color(style.hor); scene.fog = new THREE.Fog(style.hor, 110, 520);
     this.sky = skyDome(style.top, style.hor); scene.add(this.sky);
+    this.moon = new THREE.Mesh(new THREE.SphereGeometry(26, 24, 16), new THREE.MeshBasicMaterial({ color: 0xfff4d0, fog: false })); this.moon.position.set(-430, 520, -520); this.moon.visible = !!style.stars; this.sky.add(this.moon);
 
     this.hemi = new THREE.HemisphereLight(style.top, style.grass, style.hemi); scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(style.sun, style.sunI); this.sun.castShadow = true;
@@ -73,18 +120,19 @@ export class GameView {
     scene.add(this.sun, this.sun.target);
     this.headlight = new THREE.PointLight(0xfff1c9, 0, 44, 1.2); scene.add(this.headlight); this.tunnelK = 0;
 
-    this._clouds(style); this._hills(style); if (style.stars) this._stars();
+    this._clouds(style); this._hills(style); this._stars(); this.stars.visible = !!style.stars;
+    this.headGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,244,200,1)'); r.addColorStop(0.35, 'rgba(255,230,150,.55)'); r.addColorStop(1, 'rgba(255,220,120,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false })); this.headGlow.scale.setScalar(2.6); this.headGlow.visible = false; this.headGlow.userData.noShadow = true; scene.add(this.headGlow);
     this._terrain(stage, style, G);
     await this._props(stage, G);
     this._collectibles(stage, G); this._features(stage, G); this._animals(stage, G);
     await this._decor(stage, style, G);
-    await this._vehicle(spec, vp);
+    await this._vehicle(spec, vp); await this._wagons(stage);
     this._fx();
-    const s = stage.start; this.cam.x = s.x + 4; this.cam.y = s.y + 1.8; this.cam.d = 24;
+    const s = stage.start, ex = stage.trainExtra || 0; this.cam.x = s.x + 4 - ex * 0.5; this.cam.y = s.y + 1.8; this.cam.d = 24 + ex * 0.85;
   }
 
   _clouds(style) {
-    const g = new THREE.Group(), r = mulberry32(21), mat = new THREE.MeshBasicMaterial({ color: style.cloud, fog: false });
+    const g = new THREE.Group(), r = mulberry32(21), mat = new THREE.MeshBasicMaterial({ color: style.cloud, fog: false }); this.cloudMat = mat;
     for (let i = 0; i < 26; i++) {
       const c = new THREE.Group(), n = 3 + Math.floor(r() * 3);
       for (let j = 0; j < n; j++) { const s = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), mat); s.scale.set(9 + r() * 7, 4 + r() * 3, 6 + r() * 4); s.position.set(j * 9 - n * 4, r() * 2, r() * 4); c.add(s); }
@@ -93,7 +141,7 @@ export class GameView {
     this.clouds = g; this.scene.add(g);
   }
   _hills(style) {
-    const g = new THREE.Group(), r = mulberry32(5), mat = new THREE.MeshStandardMaterial({ color: style.hill, flatShading: true, roughness: 1 });
+    const g = new THREE.Group(), r = mulberry32(5), mat = new THREE.MeshStandardMaterial({ color: style.hill, flatShading: true, roughness: 1 }); this.hillMat = mat;
     for (let i = 0; i < 40; i++) {
       const h = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), mat), w = 40 + r() * 60;
       h.scale.set(w, 12 + r() * 26, w * 0.8); h.position.set((i - 20) * 70 + r() * 30, -6, -260 - r() * 200); g.add(h);
@@ -108,7 +156,7 @@ export class GameView {
   }
 
   _terrain(stage, style, G) {
-    const dirtMat = std(style.dirt, { flatShading: true }), mats = {};
+    const dirtMat = std(style.dirt, { flatShading: true }), mats = {}; this.dirtMat = dirtMat; this.surfMats = mats;
     const surfMat = (s) => {
       if (mats[s]) return mats[s];
       if (s === 'shroom') { // red cap with white dots (UVs are world coordinates, one tile = 4 m)
@@ -340,6 +388,20 @@ export class GameView {
     this.carOuter = outer; this.dirSign = dir;
   }
 
+  // train wagons (gerbong): same models-on-physics idea as the locomotive, minus the damage effects
+  async _wagons(stage) {
+    this.wagonVis = [];
+    for (const id of stage.def.wagons || []) {
+      const wspec = SPECS.find((v) => v.id === id), wvp = vehiclePhysics(wspec, this.vp.scale), dir = wspec.facing === '-z' ? -1 : 1, cz = wspec.axles[0].z - wspec.axles[0].x * dir;
+      const outer = new THREE.Group(), inner = new THREE.Group(), model = await loadModel(id, { scale: wvp.scale });
+      model.position.set(0, -wvp.cy * wvp.scale, -cz * wvp.scale); inner.rotation.y = dir * Math.PI / 2; inner.add(model); outer.add(inner); this.stageGroup.add(outer);
+      model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      const raw = [], nodes = []; model.traverse((o) => { if (/wheel/i.test(o.name) && !(o.parent && /wheel/i.test(o.parent.name))) raw.push(o); });
+      for (const o of raw) { const rear = wspec.axles[0].z, front = wspec.axles[wspec.axles.length - 1].z, axle = Math.abs(o.position.z - rear) <= Math.abs(o.position.z - front) ? 0 : 1; o.rotation.order = 'YXZ'; nodes.push({ obj: o, axle, rest: o.position.clone() }); }
+      this.wagonVis.push({ outer, nodes, wvp, dir });
+    }
+  }
+
   _fx() {
     this.fxObjs = [];
     const mk = (fn, n) => Array.from({ length: n }, () => ({ fn, a: null, t0: -99, o: new THREE.Vector3(), extra: 0 }));
@@ -395,8 +457,9 @@ export class GameView {
     }
   }
 
-  update(sim, now, dt) {
-    const snap = sim.snapshot(), car = this.carOuter;
+  update(sim, now, dt, alpha = 1) {
+    this._adaptRes(dt);
+    const snap = this._interp(sim, alpha), car = this.carOuter;
     // vehicle + wheels
     const rj = sim.rumble || 0; // washboard: the vehicle rattles
     car.position.set(snap.x, snap.y + Math.sin(now * 91) * 0.04 * rj, 0); car.rotation.z = snap.a + (sim.trickAngle ? sim.trickAngle() : 0) + Math.sin(now * 77) * 0.012 * rj;
@@ -407,9 +470,18 @@ export class GameView {
       wn.obj.position.y = wn.rest.y + (ly - this.vp.axles[wn.axle].y) / s;
       wn.obj.rotation.x = -this.dirSign * w.a;
     }
+    // wagons follow their physics bodies (wheels spin and ride their suspension like the locomotive's)
+    (this.wagonVis || []).forEach((wv, i) => {
+      const w = snap.wagons && snap.wagons[i]; if (!w) return;
+      wv.outer.position.set(w.x, w.y, 0); wv.outer.rotation.z = w.a;
+      const ca = Math.cos(-w.a), sa = Math.sin(-w.a), sc = wv.wvp.scale;
+      for (const wn of wv.nodes) { const q = w.wheels[wn.axle], dx = q.x - w.x, dy = q.y - w.y; wn.obj.position.y = wn.rest.y + (dx * sa + dy * ca - wv.wvp.axles[wn.axle].y) / sc; wn.obj.rotation.x = -wv.dir * q.a; }
+    });
     // camera: look ahead, pull back with speed, smooth
-    const spd = Math.abs(sim.speed), k = 1 - Math.exp(-dt * 3.2);
+    this.spdS = (this.spdS ?? 0) + (Math.abs(sim.speed) - (this.spdS ?? 0)) * (1 - Math.exp(-dt * 2.5)); // smoothed: raw speed jitters on bumps and made the vehicle wobble on screen
+    const spd = this.spdS, k = 1 - Math.exp(-dt * 3.2);
     let tx = snap.x + Math.min(9, spd * 0.55 + 3), ty = snap.y + 1.8, td = 24 + Math.min(13, spd * 0.5);
+    if (snap.wagons && snap.wagons.length) { const span = snap.x - snap.wagons[snap.wagons.length - 1].x; tx -= span * 0.5; td += span * 0.85; } // trains: frame the whole train
     if (sim.loop) { tx = sim.loop.cx; ty = sim.loop.cy; td = 26 + sim.loop.l.R * 2.4; } // frame the whole ring while looping
     else { const airK = Math.max(0, Math.min(1, (sim.airT - 0.25) / 0.9)); td += 9 * airK; ty += 2.6 * airK; tx += 3 * airK; } // big air: pull back and look ahead
     if (!sim.dead) { // while the car is in the water the camera stays put so the splash is visible
@@ -421,10 +493,19 @@ export class GameView {
     this.camera.lookAt(this.cam.x - 1, this.cam.y - 0.3, 0);
     // follow-parallax for sky layers, light follows the car
     this.sky.position.set(this.cam.x, 0, 0); this.clouds.position.x = this.cam.x * 0.85; this.hills.position.x = this.cam.x * 0.9; if (this.stars) this.stars.position.x = this.cam.x;
-    this.sun.position.set(snap.x + 16, snap.y + 34, 22); this.sun.target.position.set(snap.x, snap.y, 0); this.sun.target.updateMatrixWorld();
+    { // shadow stability: move the light in whole shadow-map texels only (otherwise shadow edges shimmer while driving)
+      const off = this._sunOff || (this._sunOff = new THREE.Vector3(16, 34, 22)), dir = off.clone().normalize();
+      const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir).normalize(), up = new THREE.Vector3().crossVectors(dir, right), texel = 68 / 2048;
+      const tg = new THREE.Vector3(snap.x, snap.y, 0), a = tg.dot(right), b = tg.dot(up);
+      tg.addScaledVector(right, Math.round(a / texel) * texel - a).addScaledVector(up, Math.round(b / texel) * texel - b);
+      this.sun.target.position.copy(tg); this.sun.position.copy(tg).add(off); this.sun.target.updateMatrixWorld();
+    }
     // props
     if (this.propsReady === undefined) this._bindProps(sim);
-    for (const pm of this.propBind) { const b = pm.body, p = b.getPosition(); pm.mesh.position.set(p.x, p.y, 0); pm.mesh.rotation.z = b.getAngle(); }
+    for (const pm of this.propBind) {
+      if (snap.props) { const { A, B, alpha: al } = snap.props, i = pm.idx * 3; let da = B[i + 2] - A[i + 2]; da -= Math.round(da / (2 * Math.PI)) * 2 * Math.PI; pm.mesh.position.set(A[i] + (B[i] - A[i]) * al, A[i + 1] + (B[i + 1] - A[i + 1]) * al, 0); pm.mesh.rotation.z = A[i + 2] + da * al; }
+      else { const b = pm.body, p = b.getPosition(); pm.mesh.position.set(p.x, p.y, 0); pm.mesh.rotation.z = b.getAngle(); }
+    }
     // effects
     for (const s2 of this.splashes) s2.fn(now - s2.t0, s2.o, s2.y);
     for (const s2 of this.smokes) s2.fn(now - s2.t0, s2.o);
@@ -432,8 +513,11 @@ export class GameView {
     // tunnels: dim the world and switch on the headlights while the vehicle is inside
     const inT = this.stage.tunnels.some((t) => snap.x > t.x0 - 1 && snap.x < t.x1 + 1);
     this.tunnelK += ((inT ? 1 : 0) - this.tunnelK) * (1 - Math.exp(-dt * 5));
-    const tk = this.tunnelK; this.hemi.intensity = this.style.hemi * (1 - 0.62 * tk); this.sun.intensity = this.style.sunI * (1 - 0.85 * tk);
-    this.headlight.intensity = 55 * tk; this.headlight.position.set(snap.x + 3.2, snap.y + 1.4, 7);
+    const tk = this.tunnelK, nk = this.look.stars ? 1 : 0; // nk: it is night -> headlights on
+    this.hemi.intensity = this.look.hemi * (1 - 0.62 * tk); this.sun.intensity = this.look.sunI * (1 - 0.85 * tk);
+    this.headlight.intensity = Math.max(55 * tk, 34 * nk); this.headlight.position.set(snap.x + 3.2, snap.y + 1.4, 7);
+    { const on = Math.max(tk, nk) > 0.3 && !sim.dead, a = snap.a, hx = this.vp.chassis.hx; this.headGlow.visible = on;
+      if (on) { const fy = this.vp.chassis.y0 + 0.45; this.headGlow.position.set(snap.x + Math.cos(a) * hx * 0.98 - Math.sin(a) * fy, snap.y + Math.sin(a) * hx * 0.98 + Math.cos(a) * fy, 0.8); } }
     // cheering animals: jump and wave when the vehicle is close; squeak once when it arrives
     for (const a of this.animals || []) {
       const dx = snap.x - a.x, ex = Math.max(0, Math.min(1, (13 - Math.abs(dx)) / 9)), e2 = ex * ex * (3 - 2 * ex);
@@ -496,7 +580,7 @@ export class GameView {
     // meshes were added in prop order; collect them again by matching sim.props order
     this.propBind = []; this.propsReady = true;
     const meshes = this._propMeshesByOrder;
-    sim.props.forEach((p, i) => { if (meshes[i]) this.propBind.push({ body: p.body, mesh: meshes[i] }); });
+    sim.props.forEach((p, i) => { if (meshes[i]) this.propBind.push({ body: p.body, mesh: meshes[i], idx: i }); });
   }
 
   render() { this.renderer.render(this.scene, this.camera); }

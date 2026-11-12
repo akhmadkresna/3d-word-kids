@@ -7,7 +7,7 @@ const LIST = {
   'toy-car-kit': ['vehicle-monster-truck', 'vehicle-speedster', 'vehicle-drag-racer', 'vehicle-racer', 'vehicle-racer-low', 'vehicle-suv', 'vehicle-truck', 'vehicle-vintage-racer'],
   'racing-kit': ['raceCarRed', 'raceCarGreen', 'raceCarOrange', 'raceCarWhite'],
   'starter-kit': ['vehicle-motorcycle', 'vehicle-truck-red', 'vehicle-truck-yellow', 'vehicle-truck-green', 'vehicle-truck-purple'],
-  'train-kit': ['train-diesel-a', 'train-diesel-b', 'train-locomotive-a', 'train-locomotive-c', 'train-electric-bullet-a', 'train-electric-city-a', 'train-tram-classic', 'train-tram-modern'],
+  'train-kit': ['train-carriage-box', 'train-carriage-coal', 'train-carriage-container-blue', 'train-carriage-container-green', 'train-carriage-container-red', 'train-carriage-dirt', 'train-carriage-flatbed', 'train-carriage-flatbed-wood', 'train-carriage-lumber', 'train-carriage-tank', 'train-carriage-tank-large', 'train-carriage-wood', 'train-diesel-a', 'train-diesel-b', 'train-locomotive-a', 'train-locomotive-c', 'train-electric-bullet-a', 'train-electric-city-a', 'train-tram-classic', 'train-tram-modern'],
 };
 const FACES_MINUS_Z = ['toy-car-kit'];
 
@@ -63,7 +63,7 @@ for (const [pack, files] of Object.entries(LIST)) for (const file of files) {
   if (minusZ) axles.reverse();
   const cz = (mn[2] + mx[2]) / 2, dir = minusZ ? -1 : 1;
   const spec = {
-    id, name: pretty(id), pack, facing: minusZ ? '-z' : '+z',
+    id, name: pretty(id), carriage: /carriage/.test(id) || undefined, pack, facing: minusZ ? '-z' : '+z',
     length: +(mx[2] - mn[2]).toFixed(3), height: +(mx[1] - mn[1]).toFixed(3), width: +(mx[0] - mn[0]).toFixed(3),
     bottom: +mn[1].toFixed(3), top: +mx[1].toFixed(3),
     // axle offsets measured along the vehicle's forward direction, from the body centre

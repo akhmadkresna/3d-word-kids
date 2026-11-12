@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { generateStage } from '../src/game/stages.js';
 import { runBot } from '../src/game/bot.js';
 
-const specs = JSON.parse(fs.readFileSync('src/game/vehicleSpecs.json', 'utf8'));
+const allSpecs = JSON.parse(fs.readFileSync('src/game/vehicleSpecs.json', 'utf8')), specs = allSpecs.filter((v) => !v.carriage); // wagons are not playable vehicles
 const COUNT = Number(process.argv[2] || 100);
 
 // vehicle order: friendly sedan first, then a seeded shuffle that cycles through all vehicles before repeating

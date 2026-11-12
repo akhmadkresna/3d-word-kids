@@ -55,10 +55,15 @@ export const VEHICLES = [
 // Packs whose models already face -Z (the others face +Z and get turned around).
 const FACES_MINUS_Z = ['toy-car-kit/'];
 const loader = new GLTFLoader();
+// Kenney models share a tiny palette texture: smoothing it smudges colours (looks blurry), so use crisp nearest-texel sampling + mipmaps
+const fixedTex = new Set();
+function crisp(scene) {
+  scene.traverse((o) => { if (!o.isMesh) return; for (const m of Array.isArray(o.material) ? o.material : [o.material]) { const t = m && m.map; if (t && !fixedTex.has(t)) { fixedTex.add(t); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapNearestFilter; t.anisotropy = 8; t.needsUpdate = true; } } });
+}
 
 // Loads a glb, scales it to `length` units long, rests it on y=0 and faces it toward -Z.
 export async function loadVehicle(name, length = 3.6) {
-  const gltf = await loader.loadAsync(`${import.meta.env.BASE_URL}models/${name}.glb`);
+  const gltf = await loader.loadAsync(`${import.meta.env.BASE_URL}models/${name}.glb`); crisp(gltf.scene);
   const model = gltf.scene;
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
@@ -80,7 +85,7 @@ export async function loadVehicle(name, length = 3.6) {
 const cache = new Map();
 export async function loadModel(name, { scale = 1, center = false } = {}) {
   if (!cache.has(name)) cache.set(name, loader.loadAsync(`${import.meta.env.BASE_URL}models/${name}.glb`));
-  const gltf = await cache.get(name);
+  const gltf = await cache.get(name); crisp(gltf.scene);
   const m = gltf.scene.clone(true);
   const g = new THREE.Group(); g.add(m);
   if (center) {
