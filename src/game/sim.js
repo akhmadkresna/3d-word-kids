@@ -3,7 +3,7 @@ import * as planck from 'planck';
 import { GRAVITY, vehiclePhysics } from './vehicleClass.js';
 
 const { World, Vec2, Box, Circle, Chain, Edge, WheelJoint, RevoluteJoint } = planck;
-const FRICTION = { grass: 0.9, boost: 1.0, spring: 0.9, ice: 0.05, mud: 1.1 };
+const FRICTION = { grass: 0.9, boost: 1.0, spring: 0.9, ice: 0.05, mud: 1.1, rainbow: 1.0, shroom: 0.9 };
 export const DT = 1 / 60;
 
 // Ferry platform: docks at the near lip, travels across, docks at the far lip, returns (12 s cycle).
@@ -30,7 +30,7 @@ export class Sim {
     this.events = []; this.time = 0; this.resets = 0; this.finished = false; this.finishTime = null;
     this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.throttle = 0; this.cpIndex = 0; this.hint = false;
     this.collect = stage.collectibles.map((c) => ({ ...c, got: false })); this.starsGot = 0; this.starsTotal = this.collect.length;
-    this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.props = []; this.maxX = 0;
+    this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.loop = null; this.props = []; this.maxX = 0;
     this._buildTerrain(); this._buildProps(); this._buildCar(); this.reset(true);
   }
 
@@ -109,6 +109,7 @@ export class Sim {
       const o = wh.off; wh.body.setTransform(new Vec2(p.x + o.x * ca - o.y * sa, p.y + o.x * sa + o.y * ca), 0);
       wh.body.setLinearVelocity(new Vec2(0, 0)); wh.body.setAngularVelocity(0);
     }
+    if (this.loop) { this._setDynamic(); this.loop = null; }
     this.damage = 0; // a reset / respawn repairs the vehicle
     this.throttle = 0; this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.hint = false; this.dead = false;
     this.prevV = new Vec2(0, 0); this.maxX = p.x; this.grace = 0.5;
@@ -119,6 +120,43 @@ export class Sim {
   get y() { return this.chassis.getPosition().y; }
   get angle() { return this.chassis.getAngle(); }
   get speed() { return this.chassis.getLinearVelocity().x; }
+
+  _collect(pos) { // stars + balloons: grabbed by the vehicle body or either wheel (generous radius, kids are small!)
+    const reach = this.vp.chassis.hx * 0.7 + 0.9;
+    for (const c of this.collect) {
+      if (c.got || c.x < pos.x - 6) continue;
+      if (c.x > pos.x + 6) break;
+      let near = Math.hypot(c.x - pos.x, c.y - pos.y) < reach;
+      for (let i = 0; i < this.wheels.length && !near; i++) { const q = this.wheels[i].body.getPosition(); near = Math.hypot(c.x - q.x, c.y - q.y) < this.wheels[i].r + 1.1; }
+      if (near) { c.got = true; this.starsGot++; this.events.push({ type: 'collect', kind: c.type, ci: c.ci, x: c.x, y: c.y }); }
+    }
+  }
+
+  // ---- scripted vertical loop: the vehicle rides the ring on rails (2D physics cannot cross its own track) ----
+  _bodies() { return [this.chassis, ...this.wheels.map((w) => w.body)]; }
+  _setDynamic() { for (const b of this._bodies()) b.setDynamic(); }
+  _startLoop(l, speed) {
+    const h = this.vp.axles.reduce((a, q) => a + (q.r - q.y), 0) / this.vp.axles.length; // chassis centre height above the track surface
+    this.loop = { l, th: -Math.PI / 2, v: Math.max(11, speed), rc: Math.max(1.4, l.R - h), cx: l.x0, cy: l.y + l.R, spin: 0 };
+    for (const b of this._bodies()) { b.setKinematic(); b.setLinearVelocity(new Vec2(0, 0)); b.setAngularVelocity(0); }
+    this.events.push({ type: 'loop', x: l.x0, y: l.y + l.R });
+  }
+  _loopStep(dt) {
+    const L = this.loop; L.th += (L.v / L.rc) * dt; L.spin += (L.v * dt);
+    if (L.th >= (3 * Math.PI) / 2) return this._endLoop();
+    const ang = L.th + Math.PI / 2, ca = Math.cos(ang), sa = Math.sin(ang);
+    this.chassis.setTransform(new Vec2(L.cx + L.rc * Math.cos(L.th), L.cy + L.rc * Math.sin(L.th)), ang);
+    const cp = this.chassis.getPosition();
+    for (const wh of this.wheels) wh.body.setTransform(new Vec2(cp.x + wh.off.x * ca - wh.off.y * sa, cp.y + wh.off.x * sa + wh.off.y * ca), -L.spin / wh.r);
+  }
+  _endLoop() {
+    const L = this.loop; this.loop = null; this._setDynamic();
+    const p = this._spawnPose({ x: L.cx + 2.8, y: L.l.y }), ca = Math.cos(p.a), sa = Math.sin(p.a);
+    this.chassis.setTransform(new Vec2(p.x, p.y), p.a);
+    for (const wh of this.wheels) wh.body.setTransform(new Vec2(p.x + wh.off.x * ca - wh.off.y * sa, p.y + wh.off.x * sa + wh.off.y * ca), 0);
+    for (const b of this._bodies()) { b.setLinearVelocity(new Vec2(L.v, 0)); b.setAngularVelocity(0); }
+    this.prevV = new Vec2(L.v, 0); this.grace = 0.4;
+  }
 
   grounded() {
     let n = 0;
@@ -132,6 +170,7 @@ export class Sim {
 
     // respawn timer after falling in water
     if (this.dead) { this.deadTimer -= dt; if (this.deadTimer <= 0) this.reset(); this.world.step(dt, 8, 3); return; }
+    if (this.loop) { this._loopStep(dt); this._collect(this.chassis.getPosition()); this.world.step(dt, 8, 3); return; }
 
     // throttle ramps up/down so the vehicle does not jerk
     const wantGas = gas && !this.finished;
@@ -154,12 +193,13 @@ export class Sim {
 
     // pads
     for (const pad of this.stage.pads) {
-      const inPad = this.wheels.some((wh) => { const p = wh.body.getPosition(); return p.x >= pad.x0 && p.x <= pad.x1 && p.y < pad.y + 2.5; });
+      const inPad = this.wheels.some((wh) => { const p = wh.body.getPosition(); return p.x >= pad.x0 && p.x <= pad.x1 && p.y < pad.y + (pad.type === 'shroom' ? 3.8 : 2.5); });
       const was = this.padState.get(pad) || false; this.padState.set(pad, inPad);
       if (!inPad) continue;
       if (pad.type === 'boost' && wantGas) { this.boostT = 1.1; this.chassis.applyForceToCenter(new Vec2(Math.cos(ang) * this.mass * 22, Math.sin(ang) * this.mass * 22)); if (!was) this.events.push({ type: 'boost', x: pos.x, y: pos.y }); }
       else if (pad.type === 'boost' && !was) this.events.push({ type: 'boost', x: pos.x, y: pos.y });
       if (pad.type === 'spring' && !was) { for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.05, Math.max(b.getLinearVelocity().y, 0) + 17)); this.events.push({ type: 'spring', x: pos.x, y: pos.y }); }
+      if (pad.type === 'shroom' && !was) { for (const b of this._bodies()) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.04, Math.max(b.getLinearVelocity().y, 0) + 20)); this.events.push({ type: 'shroom', x: pos.x, y: pos.y }); }
       if (pad.type === 'mud') for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) { const v = b.getLinearVelocity(); b.setLinearVelocity(new Vec2(v.x * 0.985, v.y)); }
     }
 
@@ -176,17 +216,12 @@ export class Sim {
       const hit = Math.min(0.35, (dv - 2) / 45); this.damage = Math.min(1, this.damage + hit); this.lastHit = this.time;
       this.events.push({ type: 'bump', power: Math.min(1, dv / 22), hit, damage: this.damage, dvx, dvy, x: pos.x, y: pos.y });
     }
+    for (const l of this.stage.loops) { // fast enough at the foot of a ring -> ride the loop
+      if (pos.x > l.x0 - 0.8 && pos.x < l.x0 + 1.6 && Math.abs(pos.y - (l.y + 1.3)) < 2.4 && v2.x > 7) { this._startLoop(l, v2.x); return; }
+    }
     this.prevV = new Vec2(v2.x, v2.y);
     this.maxX = Math.max(this.maxX, pos.x);
-    // stars + balloons: grabbed by the vehicle body or either wheel (generous radius, kids are small!)
-    const reach = vp.chassis.hx * 0.7 + 0.9;
-    for (const c of this.collect) {
-      if (c.got || c.x < pos.x - 6) continue;
-      if (c.x > pos.x + 6) break;
-      let near = Math.hypot(c.x - pos.x, c.y - pos.y) < reach;
-      for (let i = 0; i < this.wheels.length && !near; i++) { const q = this.wheels[i].body.getPosition(); near = Math.hypot(c.x - q.x, c.y - q.y) < this.wheels[i].r + 1.1; }
-      if (near) { c.got = true; this.starsGot++; this.events.push({ type: 'collect', kind: c.type, ci: c.ci, x: c.x, y: c.y }); }
-    }
+    this._collect(pos);
     while (this.cpIndex + 1 < this.stage.checkpoints.length && pos.x > this.stage.checkpoints[this.cpIndex + 1].x) { this.cpIndex++; this.events.push({ type: 'checkpoint', x: pos.x, y: pos.y }); }
     if (!this.finished && pos.x >= this.stage.finishX) { this.finished = true; this.finishTime = this.time; this.events.push({ type: 'finish', time: this.time, x: pos.x, y: pos.y }); }
 

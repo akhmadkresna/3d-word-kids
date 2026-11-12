@@ -15,6 +15,7 @@ save.stars ||= {}; save.best ||= {}; save.order ||= 'seq';
 const persist = () => { try { localStorage.setItem(SAVE, JSON.stringify(save)); } catch {} };
 
 const view = new GameView($('game')), audio = new GameAudio();
+view.onSound = (e) => audio.play(e); // animals cheer when the vehicle passes
 let recMode = false, recorder = null, curDef = null, normalK = 1;
 let sim = null, stage = null, k = 1, state = 'loading', now = 0, gasKeys = 0, gasPtr = false, countdown = 0, finishAt = 0, hintShown = false, loadToken = 0;
 const params = new URLSearchParams(location.search), autoGas = params.has('autogas');

@@ -8,7 +8,7 @@ const STEP = 0.8;
 
 export function buildStage(def) {
   const rng = mulberry32(def.seed || 1);
-  const S = { def, pieces: [], walls: [], props: [], pads: [], pits: [], blocks: [], checkpoints: [] };
+  const S = { def, pieces: [], walls: [], props: [], pads: [], pits: [], blocks: [], checkpoints: [], loops: [], tunnels: [] };
   let x = 0, y = 0, cur = { surface: 'grass', pts: [[0, 0]] }, lastCp = -999;
   // collectibles: stars + balloons. Line/balloon requests are resolved once the ground height is known.
   S.collectibles = []; const lineReqs = [], balloonReqs = [], crng = mulberry32((def.seed || 1) + 4242);
@@ -70,6 +70,28 @@ export function buildStage(def) {
       flat(s.runup); const r = pit(s.w, 0);
       S.props.push({ type: 'ferry', x0: r.lipX, x1: r.landX, y: r.lipY, len: s.len });
       flat(14);
+    },
+    loop: (s) => { // boost pad -> scripted vertical loop (the vehicle rides the ring), then flat ground
+      flat(s.runup); S.pads.push({ type: 'boost', x0: x, x1: x + 12, y }); flat(12, 'boost'); flat(5);
+      const l = { x0: x, y, R: s.R }; S.loops.push(l);
+      for (let i = 0; i < 8; i++) { const a = -Math.PI / 2 + ((i + 0.5) / 8) * Math.PI * 2; addStar(l.x0 + (s.R - 1.4) * Math.cos(a), y + s.R + (s.R - 1.4) * Math.sin(a)); }
+      flat(s.R + 12);
+    },
+    rainbow: (s) => { // floating rainbow bridge: no ground under it
+      flat(6); piece('rainbow'); profile(s.up, (t) => s.h * sm(t)); flat(s.top); profile(s.up, (t) => -s.h * sm(t)); piece('grass'); flat(4);
+    },
+    tunnel: (s) => { // dark tunnel with a few bumps (rendering darkens the world while you are inside)
+      flat(6); const x0 = x, n = s.bumps, seg = s.len / n;
+      for (let i = 0; i < n; i++) { flat(seg - 4); profile(4, (t) => 0.4 * Math.sin(Math.PI * t)); }
+      S.tunnels.push({ x0, x1: x }); flat(6);
+    },
+    shrooms: (s) => { // big red bouncy mushrooms: each one launches you high
+      for (let i = 0; i < s.n; i++) {
+        flat(s.gap); const x0 = x, y0 = y; piece('shroom'); profile(6, (t) => 1.5 * Math.pow(Math.sin(Math.PI * t), 0.7)); piece('grass');
+        S.pads.push({ type: 'shroom', x0, x1: x, y: y0 });
+        if (i < s.n - 1) starArc(x, y0, x + s.gap, y0, 7.5, 4);
+      }
+      flat(10);
     },
     drop: (s) => { // sudden cliff down, then climb back up
       flat(s.len); push(x, y - s.h); flat(6); profile(s.h * 4.5, (t) => s.h * 0.9 * sm(t)); flat(4);

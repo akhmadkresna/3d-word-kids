@@ -17,6 +17,12 @@ No boring flat roads: the ground between obstacles rolls, and **every stage has 
 ⭐ **Stars and 🎈 balloons** float along every track (over jumps, up mountains, on hill crests); drive through them for a sparkle + a rising "ding" combo. The counter is in the top bar.
 Also: tall **ski jumps** into cliff landings, **roller-coaster hills** for airtime, boost-pad long jumps, ferries, springs, drops, ice, mud and more.
 
+## Showpieces and friends
+- **Cheering animals** (bunny, chick, bear, frog, sheep, pig) stand along every track and a crowd waits at the finish; they jump, wave and squeak as the vehicle passes.
+- **Loop-the-loop:** hit the boost pad, then ride the striped ring (it is a scripted "magic" loop, so it always works).
+- **Rainbow bridge:** a glowing rainbow road floating in the sky. **Tunnel:** the world goes dark, neon lights and headlights come on. **Bouncy mushrooms:** big red polka-dot domes that launch you sky-high. The **candy** world has giant lollipops.
+Every stage has a ramp jump, a high climb, one showpiece (loop / rainbow / tunnel / mushrooms) and one classic obstacle, plus stars and balloons.
+
 ## Damage
 Every knock adds damage in proportion to how hard it was (soft landing ≈ 3–6 %, hard crash up to 35 %). The meter under the stage name shows it, and the vehicle shows it:
 smoke that gets thicker and darker, fire above ~60 %, a sooty crumpled body, a wobbly wheel, debris flying off, and a sputtering engine. It is cosmetic only (stages stay solvable).

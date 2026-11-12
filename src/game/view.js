@@ -10,7 +10,7 @@ export const THEME_STYLE = {
   desert: { top: 0x4aa3e8, hor: 0xffe8c0, grass: 0xe0b86a, dirt: 0xb98a4a, hill: 0xd9a45a, cloud: 0xfff6e8, sun: 0xfff0d0, sunI: 2.6, hemi: 1.0, cactus: true },
   snow: { top: 0x7fb0e8, hor: 0xf0f6ff, grass: 0xf4f8ff, dirt: 0xaebfd0, hill: 0xdfe9f5, cloud: 0xffffff, sun: 0xffffff, sunI: 2.0, hemi: 1.1, trees: ['toy-car-kit/tree-pine'] },
   sunset: { top: 0x3b3f8f, hor: 0xffb27a, grass: 0x5f8f3a, dirt: 0x6b4a34, hill: 0x4a7a35, cloud: 0xffd9bf, sun: 0xffc48a, sunI: 2.4, hemi: 1.0, trees: ['toy-car-kit/tree', 'racing-kit/treeLarge'] },
-  candy: { top: 0xff8fd0, hor: 0xffe6f2, grass: 0x7be0c3, dirt: 0xd96aa7, hill: 0xb48cff, cloud: 0xffffff, sun: 0xfff0f8, sunI: 2.2, hemi: 1.1, trees: ['racing-kit/treeSmall', 'toy-car-kit/tree'], tint: 0xff9ad0 },
+  candy: { lolli: true, top: 0xff8fd0, hor: 0xffe6f2, grass: 0x7be0c3, dirt: 0xd96aa7, hill: 0xb48cff, cloud: 0xffffff, sun: 0xfff0f8, sunI: 2.2, hemi: 1.1, trees: ['racing-kit/treeSmall', 'toy-car-kit/tree'], tint: 0xff9ad0 },
   night: { top: 0x0b1030, hor: 0x2e3f86, grass: 0x2f6b3a, dirt: 0x4a3a2a, hill: 0x1e3a55, cloud: 0x6f7fb5, sun: 0xaabbff, sunI: 1.5, hemi: 1.15, trees: ['toy-car-kit/tree-pine', 'racing-kit/treeLarge'], tint: 0x6f9f7f, stars: true },
 };
 const SURFACE = { ice: 0xa6e6ff, mud: 0x5b3b22, boost: 0x39d96b, spring: 0xff5a5a };
@@ -53,7 +53,7 @@ export class GameView {
   clearStage() {
     this.stageGroup.traverse((o) => { if (o.geometry && !o.userData.shared) o.geometry.dispose(); if (o.material && o.userData.ownMat) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose()); });
     this.scene.remove(this.stageGroup); this.stageGroup = new THREE.Group(); this.scene.add(this.stageGroup);
-    for (const o of [this.sky, this.clouds, this.hills, this.stars, this.sun, this.hemi]) if (o) this.scene.remove(o);
+    for (const o of [this.sky, this.clouds, this.hills, this.stars, this.sun, this.hemi, this.headlight]) if (o) this.scene.remove(o);
     if (this.confetti) { this.scene.remove(this.confetti.mesh); this.confetti = null; }
     for (const f of this.fxObjs || []) f.root.forEach((o) => this.scene.remove(o));
     this.fxObjs = []; this.running = [];
@@ -71,11 +71,12 @@ export class GameView {
     this.sun.shadow.mapSize.set(2048, 2048); this.sun.shadow.bias = -0.0005; this.sun.shadow.normalBias = 0.04;
     Object.assign(this.sun.shadow.camera, { left: -34, right: 34, top: 26, bottom: -26, near: 1, far: 140 });
     scene.add(this.sun, this.sun.target);
+    this.headlight = new THREE.PointLight(0xfff1c9, 0, 44, 1.2); scene.add(this.headlight); this.tunnelK = 0;
 
     this._clouds(style); this._hills(style); if (style.stars) this._stars();
     this._terrain(stage, style, G);
     await this._props(stage, G);
-    this._collectibles(stage, G);
+    this._collectibles(stage, G); this._features(stage, G); this._animals(stage, G);
     await this._decor(stage, style, G);
     await this._vehicle(spec, vp);
     this._fx();
@@ -108,9 +109,28 @@ export class GameView {
 
   _terrain(stage, style, G) {
     const dirtMat = std(style.dirt, { flatShading: true }), mats = {};
-    const surfMat = (s) => mats[s] || (mats[s] = std(SURFACE[s] ?? style.grass));
+    const surfMat = (s) => {
+      if (mats[s]) return mats[s];
+      if (s === 'shroom') { // red cap with white dots (UVs are world coordinates, one tile = 4 m)
+        const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#e53935'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#fff';
+        for (const [x, y, r] of [[28, 30, 16], [92, 22, 11], [70, 78, 18], [22, 100, 10], [110, 108, 13]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+        const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(0.25, 0.25); t.colorSpace = THREE.SRGBColorSpace;
+        return (mats[s] = std(0xffffff, { map: t }));
+      }
+      return (mats[s] = std(SURFACE[s] ?? style.grass));
+    };
+    const ribbon = (pts, d0, d1, mat, depth) => { // thin extruded strip between (y-d0) and (y-d1)
+      const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1] - d0); for (const q of pts) sh.lineTo(q[0], q[1] - d0);
+      for (let i = pts.length - 1; i >= 0; i--) sh.lineTo(pts[i][0], pts[i][1] - d1); sh.closePath();
+      const m = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false }), mat); m.position.z = -depth / 2; return m;
+    };
+    const RAINBOW = [0xff3b3b, 0xff9100, 0xffeb3b, 0x4cd964, 0x40c4ff, 0x5c6bc0, 0xb388ff];
     for (const p of stage.pieces) {
       if (p.pts.length < 2) continue;
+      if (p.surface === 'rainbow') { // floating rainbow bridge: 7 glowing colour bands, no ground underneath
+        RAINBOW.forEach((c, i) => { const m = ribbon(p.pts, i * 0.15, (i + 1) * 0.15 + 0.01, new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.45, roughness: 0.5 }), DEPTH * 0.92); m.castShadow = true; G.add(m); });
+        continue;
+      }
       const pts = p.pts, minY = Math.min(...pts.map((q) => q[1])) - 14, shape = new THREE.Shape();
       shape.moveTo(pts[0][0], minY); shape.lineTo(pts[0][0], pts[0][1] - 0.45); for (const q of pts) shape.lineTo(q[0], q[1] - 0.45); shape.lineTo(pts[pts.length - 1][0], minY); shape.closePath();
       const body = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: DEPTH, bevelEnabled: false }), dirtMat);
@@ -186,6 +206,75 @@ export class GameView {
     }
   }
 
+  _features(stage, G) {
+    // vertical loops: striped ring + two rails (the vehicle rides it on rails, see sim._startLoop)
+    for (const l of stage.loops) {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 32; const g = c.getContext('2d');
+      for (let i = 0; i < 16; i++) { g.fillStyle = i % 2 ? '#ffffff' : '#ff5252'; g.fillRect(i * 16, 0, 16, 32); }
+      const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.repeat.set(3, 1); tex.colorSpace = THREE.SRGBColorSpace;
+      const grp = new THREE.Group(); grp.position.set(l.x0, l.y + l.R, 0);
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(l.R, l.R, 4.6, 72, 1, true), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.55 })); band.rotation.x = Math.PI / 2; band.castShadow = true; grp.add(band);
+      for (const z of [-2.35, 2.35]) { const rail = new THREE.Mesh(new THREE.TorusGeometry(l.R, 0.22, 8, 72), std(0x37474f, { metalness: 0.3 })); rail.position.z = z; grp.add(rail); }
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.6, 0.4), std(0x37474f)); sign.position.set(-l.R - 2.5, -l.R + 1.3, 3.2); grp.add(sign);
+      G.add(grp);
+    }
+    // tunnels: dark back wall with neon strips, ceiling with lamps, portal frames (the world also darkens while you are inside)
+    const neon = [0x40c4ff, 0xff4081, 0xffeb3b, 0x69f0ae];
+    for (const t of stage.tunnels) {
+      const wall = std(0x1c2140, { roughness: 0.9 }), ceil = std(0x2b3158);
+      let i = 0;
+      for (let x = t.x0; x < t.x1; x += 6, i++) {
+        const xm = x + 3, gy = stage.groundY(xm) ?? stage.groundY(x) ?? 0;
+        const w = new THREE.Mesh(new THREE.BoxGeometry(6.02, 11, 0.4), wall); w.position.set(xm, gy + 4.4, -3.5); G.add(w);
+        for (const yy of [1.0, 7.0]) { const n = new THREE.Mesh(new THREE.BoxGeometry(6.02, 0.2, 0.1), new THREE.MeshBasicMaterial({ color: neon[(i + (yy > 3 ? 1 : 0)) % 4] })); n.position.set(xm, gy + yy, -3.25); G.add(n); }
+        const c = new THREE.Mesh(new THREE.BoxGeometry(6.02, 0.5, 7.2), ceil); c.position.set(xm, gy + 8.4, 0); c.castShadow = true; G.add(c);
+        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff2b0 })); lamp.position.set(xm, gy + 7.9, 0); lamp.userData.noShadow = true; G.add(lamp);
+      }
+      for (const xp of [t.x0, t.x1]) {
+        const gy = stage.groundY(xp) ?? 0, col = std(xp === t.x0 ? 0x40c4ff : 0xff4081);
+        for (const z of [-3.1, 3.1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.8, 9.2, 0.8), col); p.position.set(xp, gy + 4.2, z); G.add(p); }
+        const l = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 7.4), col); l.position.set(xp, gy + 8.9, 0); G.add(l);
+      }
+    }
+  }
+
+  // ---- cheering animals (built from simple shapes; they jump and wave when the vehicle passes) ----
+  _makeAnimal(kind) {
+    const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, ...o });
+    const root = new THREE.Group(), sph = (r, c, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), M(c)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; return m; };
+    const P = { bunny: { b: 0xffffff, h: 0xffffff, a: 0xffffff }, chick: { b: 0xffd54a, h: 0xffd54a, a: 0xffc107 }, bear: { b: 0x9a6a43, h: 0xa87750, a: 0x8a5c3a }, frog: { b: 0x5bc85b, h: 0x6fd86f, a: 0x4caf50 }, sheep: { b: 0xfafafa, h: 0x4e4e4e, a: 0xeeeeee }, pig: { b: 0xffa8c0, h: 0xffb3c9, a: 0xff94b2 } }[kind];
+    root.add(sph(0.5, P.b, 0, 0.55, 0, 1, 1.05, 0.9));
+    const head = new THREE.Group(); head.position.set(0, 1.3, 0.05); head.add(sph(kind === 'sheep' ? 0.3 : 0.42, P.h, 0, 0, kind === 'sheep' ? 0.25 : 0, 1, 1, 1)); root.add(head);
+    const eye = (x, y, z, r = 0.075) => { head.add(sph(r, 0x111111, x, y, z)); };
+    if (kind === 'frog') { for (const sx of [-1, 1]) { head.add(sph(0.16, 0xffffff, sx * 0.22, 0.38, 0.1)); head.add(sph(0.08, 0x111111, sx * 0.22, 0.4, 0.23)); } const mo = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.05), M(0x2e7d32)); mo.position.set(0, -0.12, 0.4); head.add(mo); }
+    else if (kind === 'sheep') { eye(-0.1, 0.0, 0.5); eye(0.1, 0.0, 0.5); for (let i = 0; i < 5; i++) head.add(sph(0.17, 0xffffff, (i - 2) * 0.14, 0.3, 0.1)); for (const sx of [-1, 1]) head.add(sph(0.08, 0x333333, sx * 0.3, 0.05, 0.2, 1.8, 0.8, 0.8)); }
+    else { eye(-0.16, 0.06, 0.36); eye(0.16, 0.06, 0.36); }
+    if (kind === 'bunny') { for (const sx of [-1, 1]) { const ear = sph(0.12, 0xffffff, sx * 0.15, 0.62, 0, 1, 3.4, 0.7); head.add(ear); head.add(sph(0.06, 0xffb6c8, sx * 0.15, 0.62, 0.05, 1, 3.4, 0.5)); } head.add(sph(0.06, 0xff7f9f, 0, -0.05, 0.4)); root.add(sph(0.14, 0xffffff, 0, 0.35, -0.5)); }
+    if (kind === 'chick') { const beak = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.22, 8), M(0xff9800)); beak.rotation.x = Math.PI / 2; beak.position.set(0, -0.02, 0.5); head.add(beak); head.add(sph(0.07, 0xffc107, 0, 0.45, 0.05, 0.6, 1.8, 0.6)); }
+    if (kind === 'bear') { for (const sx of [-1, 1]) head.add(sph(0.15, 0x8a5c3a, sx * 0.32, 0.34, 0)); head.add(sph(0.18, 0xd7b894, 0, -0.1, 0.34, 1, 0.8, 0.8)); head.add(sph(0.06, 0x111111, 0, -0.03, 0.5)); }
+    if (kind === 'pig') { const sn = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.15, 14), M(0xff8fb0)); sn.rotation.x = Math.PI / 2; sn.position.set(0, -0.08, 0.44); head.add(sn); for (const sx of [-1, 1]) { head.add(sph(0.03, 0x7a2a45, sx * 0.06, -0.08, 0.52)); const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.22, 6), M(0xff8fb0)); ear.position.set(sx * 0.28, 0.38, 0); ear.rotation.z = -sx * 0.5; head.add(ear); } }
+    const arms = [];
+    for (const sx of [-1, 1]) {
+      const piv = new THREE.Group(); piv.position.set(sx * 0.5, 0.85, 0);
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.11, 0.55, 8), M(P.a)); arm.position.y = -0.27; arm.castShadow = true; piv.add(arm);
+      piv.add(sph(0.12, P.a, 0, -0.56, 0)); root.add(piv); arms.push({ piv, sx });
+      root.add(sph(0.16, 0x37474f, sx * 0.2, 0.06, 0.18, 1, 0.6, 1.4));
+    }
+    return { root, arms, head };
+  }
+  _animals(stage, G) {
+    this.animals = []; const kinds = ['bunny', 'chick', 'bear', 'frog', 'sheep', 'pig'], r = mulberry32((stage.def.seed || 1) + 777);
+    const spots = [];
+    for (let x = 32; x < stage.finishX - 10; x += 26 + r() * 30) spots.push(x);
+    for (let i = 0; i < 6; i++) spots.push(stage.finishX + 4 + i * 4.2); // a crowd at the finish
+    spots.forEach((x, i) => {
+      const gy = stage.groundY(x); if (gy == null || stage.pits.some((p) => x > p.x0 - 8 && x < p.x1 + 8) || stage.loops.some((l) => Math.abs(x - l.x0) < l.R + 4) || stage.tunnels.some((t) => x > t.x0 - 4 && x < t.x1 + 4)) return;
+      const a = this._makeAnimal(kinds[Math.floor(r() * kinds.length)]); const sc = 1.7 + r() * 0.5;
+      a.root.scale.setScalar(sc); a.root.position.set(x, gy, -(1.9 + r() * 1.1)); a.root.traverse((o) => { if (o.isMesh) o.userData.noShadow = false; });
+      G.add(a.root); this.animals.push({ ...a, x, gy, i, sc, cheered: false, z: a.root.position.z });
+    });
+  }
+
   async _decor(stage, style, G) {
     const r = mulberry32(stage.def.seed + 5), end = stage.length;
     const addTree = async (name, x, y, z, sc) => {
@@ -196,6 +285,13 @@ export class GameView {
     for (let x = 4; x < end + 30; x += 5 + r() * 9) {
       const gy = stage.groundY(x) ?? stage.groundY(x - 3) ?? 0, z = -(7 + r() * 28), depthShade = 1;
       if (style.cactus) { const c = new THREE.Group(), mat = std(0x3f8f3f), h = 2.5 + r() * 3; const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, h, 10), mat); trunk.position.y = h / 2; c.add(trunk); for (const sd of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.28, 1.3, 8), mat); arm.position.set(sd * 0.75, h * 0.6, 0); c.add(arm); const up = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 1, 8), mat); up.position.set(sd * 1.0, h * 0.6 + 0.8, 0); c.add(up); } c.position.set(x, gy, z); G.add(c); }
+      else if (style.lolli && r() < 0.6) { // giant swirl lollipop
+        const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const cols = ['#ff5fa2', '#ffffff', '#7be0c3', '#ffe066'];
+        for (let i = 0; i < 12; i++) { g.fillStyle = cols[i % 2 ? 1 : (i / 2) % 2 ? 0 : 2]; g.beginPath(); g.moveTo(64, 64); g.arc(64, 64, 64, (i / 12) * 6.283, ((i + 1) / 12) * 6.283); g.fill(); }
+        const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; const h = 3 + r() * 3, rad = 1.1 + r() * 0.8, lp = new THREE.Group();
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, h, 8), std(0xffffff)); stick.position.y = h / 2; const disc = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, 0.3, 28), [std(0xffffff), new THREE.MeshStandardMaterial({ map: tex }), new THREE.MeshStandardMaterial({ map: tex })]); disc.rotation.x = Math.PI / 2; disc.position.y = h + rad * 0.6;
+        lp.add(stick, disc); lp.position.set(x, gy, z); G.add(lp);
+      }
       else { const t = style.trees[Math.floor(r() * style.trees.length)]; await addTree(t, x, gy - 0.1, z, 3.2 + r() * 3.5); }
     }
     // start + finish gates, checkpoint flags
@@ -275,6 +371,8 @@ export class GameView {
   }
   event(e, now) {
     if (e.type === 'bump' && e.hit > 0.03) this._debris(e, now);
+    if (e.type === 'loop') for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; this._puff(now, e.x + Math.cos(a) * 5.5, e.y + Math.sin(a) * 5.5, Math.cos(a) * 2, Math.sin(a) * 2, 0.9, 0.3, 0.9, false, 0, [0xff5252, 0xffffff, 0xffeb3b, 0x40c4ff][i % 4]); }
+    if (e.type === 'shroom') for (let i = 0; i < 10; i++) { const a = Math.PI * (0.15 + 0.7 * (i / 9)); this._puff(now, e.x, e.y, Math.cos(a) * 5, Math.sin(a) * 5, 0.8, 0.25, 0.9, false, 0, i % 2 ? 0xffffff : 0xff5a5a); }
     if (e.type === 'collect') { // sparkle burst
       const cols = e.kind === 'balloon' ? [0xff4081, 0xffeb3b, 0x40c4ff, 0x69f0ae] : [0xffe066, 0xfff3a0, 0xffc400];
       for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2 + Math.random(); this._puff(now, e.x, e.y, Math.cos(a) * (2 + Math.random() * 3), Math.sin(a) * (2 + Math.random() * 3), 0.5, 0.18, 0.5, false, 0, cols[i % cols.length]); }
@@ -301,7 +399,8 @@ export class GameView {
     }
     // camera: look ahead, pull back with speed, smooth
     const spd = Math.abs(sim.speed), k = 1 - Math.exp(-dt * 3.2);
-    const tx = snap.x + Math.min(9, spd * 0.55 + 3), ty = snap.y + 1.8, td = 24 + Math.min(13, spd * 0.5);
+    let tx = snap.x + Math.min(9, spd * 0.55 + 3), ty = snap.y + 1.8, td = 24 + Math.min(13, spd * 0.5);
+    if (sim.loop) { tx = sim.loop.cx; ty = sim.loop.cy; td = 26 + sim.loop.l.R * 2.4; } // frame the whole ring while looping
     if (!sim.dead) { // while the car is in the water the camera stays put so the splash is visible
       this.cam.x += (tx - this.cam.x) * k; this.cam.y += (ty - this.cam.y) * (1 - Math.exp(-dt * 2.2));
     }
@@ -319,6 +418,21 @@ export class GameView {
     for (const s2 of this.splashes) s2.fn(now - s2.t0, s2.o, s2.y);
     for (const s2 of this.smokes) s2.fn(now - s2.t0, s2.o);
     this._damageFx(sim, now, dt, snap);
+    // tunnels: dim the world and switch on the headlights while the vehicle is inside
+    const inT = this.stage.tunnels.some((t) => snap.x > t.x0 - 1 && snap.x < t.x1 + 1);
+    this.tunnelK += ((inT ? 1 : 0) - this.tunnelK) * (1 - Math.exp(-dt * 5));
+    const tk = this.tunnelK; this.hemi.intensity = this.style.hemi * (1 - 0.62 * tk); this.sun.intensity = this.style.sunI * (1 - 0.85 * tk);
+    this.headlight.intensity = 55 * tk; this.headlight.position.set(snap.x + 3.2, snap.y + 1.4, 7);
+    // cheering animals: jump and wave when the vehicle is close; squeak once when it arrives
+    for (const a of this.animals || []) {
+      const dx = snap.x - a.x, ex = Math.max(0, Math.min(1, (13 - Math.abs(dx)) / 9)), e2 = ex * ex * (3 - 2 * ex);
+      a.root.position.y = a.gy + Math.abs(Math.sin(now * 9 + a.i)) * 0.6 * e2 * a.sc * 0.55;
+      a.root.rotation.y = Math.max(-0.55, Math.min(0.55, dx * -0.05)) * e2; a.head.rotation.z = Math.sin(now * 6 + a.i) * 0.12 * e2;
+      for (const { piv, sx } of a.arms) piv.rotation.z = sx * (0.25 + e2 * (2.0 + Math.sin(now * 13 + a.i + sx) * 0.55));
+      if (!a.cheered && Math.abs(dx) < 7) { a.cheered = true; if (this.onSound) this.onSound({ type: 'cheer', pitch: a.i % 5 });
+        for (let j = 0; j < 5; j++) this._puff(now, a.x + (j - 2) * 0.6, a.gy + 3.4 * a.sc * 0.8, (j - 2) * 0.8, 2.2 + Math.random(), 0.8, 0.2, 0.6, false, 0, [0xff4081, 0xffeb3b, 0xffffff][j % 3]); }
+      if (Math.abs(dx) > 40) a.cheered = false;
+    }
     if (this.collectMeshes) sim.collect.forEach((c, i) => {
       const g = this.collectMeshes[i]; if (!g) return;
       g.visible = !c.got; if (c.got) return;
