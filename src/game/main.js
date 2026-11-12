@@ -55,6 +55,28 @@ function doReset() {
 let lastPop = -9, lastTrickDir = 1;
 function pop(text, big = false) { const el = $('pop'); el.textContent = text; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); lastPop = now; }
 
+// ---------- full screen ----------
+const fsRoot = document.documentElement;
+const fsRequest = fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen, fsExit = document.exitFullscreen || document.webkitExitFullscreen;
+const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement) || (navigator.standalone === true);
+let toastTimer = 0;
+function toast(html, ms = 4500) { const el = $('toast'); el.innerHTML = html; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), ms); }
+async function toggleFullscreen() {
+  audio.start();
+  if (!fsRequest) { // iPhone Safari cannot make a web page full screen; an installed Home Screen app can
+    toast('📱 On iPhone: tap <b>Share ⬆</b> then <b>Add to Home Screen</b>.<br>Open the game from your Home Screen to play full screen!', 7000); return;
+  }
+  try {
+    if (document.fullscreenElement || document.webkitFullscreenElement) await fsExit.call(document);
+    else { await fsRequest.call(fsRoot, { navigationUI: 'hide' }); try { await screen.orientation.lock('landscape'); } catch { /* not supported / not allowed: fine */ } }
+  } catch (e) { toast('Full screen is not available here. Try "Add to Home Screen" from your browser menu.', 5000); }
+}
+function syncFs() { document.body.classList.toggle('isfs', !!(document.fullscreenElement || document.webkitFullscreenElement)); view.resize(); }
+document.addEventListener('fullscreenchange', syncFs); document.addEventListener('webkitfullscreenchange', syncFs);
+$('fsBtn').onclick = toggleFullscreen;
+if (navigator.standalone === true || matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches) $('fsBtn').style.display = 'none'; // already an installed full-screen app
+addEventListener('keydown', (e) => { if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey) { e.preventDefault(); toggleFullscreen(); } });
+
 // ---------- UI ----------
 const setMsg = (html) => { $('msg').innerHTML = html; };
 const fmt = (t) => (t >= 60 ? `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}` : `${t.toFixed(1)}s`);

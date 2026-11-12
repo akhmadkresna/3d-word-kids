@@ -9,7 +9,7 @@ Built to play with kids — and to record: one video can cover many stages (the 
 | **GAS** (hold) | `Space` (or ↑ → D W) | big green button |
 | **RESET** (back to last checkpoint) | `R` | big orange button |
 
-Extras: the **☰ Stages** button (or `Esc`) opens the stage picker (any stage, restart, music on/off). **🎲** jumps to a random stage, and the menu can switch auto-advance between *in order* and *random* (handy for recording). Direct link to a stage: `…/#37`.
+Extras: the **⛶ full-screen button** (or `F`; on iPhone use *Share → Add to Home Screen*, then open it from the Home Screen: it is installable and runs full screen in landscape), the **☰ Stages** button (or `Esc`) opens the stage picker (any stage, restart, music on/off). **🎲** jumps to a random stage, and the menu can switch auto-advance between *in order* and *random* (handy for recording). Direct link to a stage: `…/#37`.
 Finish a stage → ★ rating by time (par is based on a test bot) → next stage starts automatically (or press GAS).
 
 ## What makes it fun (tuned from real play-testing with kids)

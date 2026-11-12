@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#1e88e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vroom">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E🚗%3C/text%3E%3C/svg%3E">
 <title>Vroom Stages – 100 stage car game</title>
 <style>
@@ -45,6 +51,9 @@
   #pop.show { animation: popin 1.3s ease-out; }
   @keyframes popin { 0% { opacity: 0; transform: translate(-50%,-30%) scale(.4); } 14% { opacity: 1; transform: translate(-50%,-50%) scale(1.18); } 30% { transform: translate(-50%,-50%) scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-90%) scale(1.05); } }
   #loading { position: fixed; inset: 0; background: linear-gradient(#5eb6ff,#c9ecff); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 34px; font-weight: 900; text-shadow: 0 3px 0 rgba(0,0,0,.25); z-index: 20; }
+  #fsBtn .fs-out { display: none; } body.isfs #fsBtn .fs-in { display: none; } body.isfs #fsBtn .fs-out { display: block; }
+  #toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: min(86vw, 520px); background: rgba(15,30,60,.88); color: #fff; padding: 12px 18px; border-radius: 16px; font-weight: 700; font-size: clamp(14px, 3vw, 18px); text-align: center; line-height: 1.35; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 40; }
+  #toast.show { opacity: 1; }
   #recExit { display: none; height: 34px; min-width: 34px; border: 0; border-radius: 10px; background: rgba(15,30,60,.35); color: #fff; font-size: 16px; opacity: .45; cursor: pointer; }
   body.rec #recExit { display: block; } body.rec #tools { display: none; }
   #menu { position: fixed; inset: 0; background: rgba(8,20,45,.82); z-index: 30; display: none; overflow: auto; padding: 18px; touch-action: pan-y; }
@@ -69,12 +78,13 @@
   <div class="panel" id="prog"><div class="bar"><div class="fill" id="progFill"></div><div class="car" id="progCar">🚗</div><div class="flag">🏁</div></div></div>
   <div class="panel" id="starsBox">⭐ <span id="starNow">0</span>/<span id="starTot">0</span> · 🌀 <span id="flipNow">0</span></div>
   <div class="panel" id="time"><span id="timeNow">0.0s</span><small id="timeBest"></small></div>
-  <div id="tools"><button class="iconbtn" id="todBtn" title="Day / night">🌗</button><button class="iconbtn" id="randBtn" title="Random stage">🎲</button><button class="iconbtn" id="muteBtn" title="Sound">🔊</button><button class="iconbtn" id="menuBtn" title="Choose a stage (Esc)">☰ Stages</button></div>
+  <div id="tools"><button class="iconbtn" id="todBtn" title="Day / night">🌗</button><button class="iconbtn" id="randBtn" title="Random stage">🎲</button><button class="iconbtn" id="fsBtn" title="Full screen (F)"><svg class="fs-in" viewBox="0 0 24 24" width="22" height="22"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="fs-out" viewBox="0 0 24 24" width="22" height="22"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="iconbtn" id="muteBtn" title="Sound">🔊</button><button class="iconbtn" id="menuBtn" title="Choose a stage (Esc)">☰ Stages</button></div>
   <button id="recExit" title="Stop recording mode">⏹</button>
 </div>
 
 <div id="msg"></div>
 <div id="pop"></div>
+<div id="toast"></div>
 
 <button class="big" id="reset"><span class="main">↺</span><span class="hint">RESET · R</span></button>
 <button class="big" id="gas"><span class="main">GAS</span><span class="hint">hold · SPACE</span></button>
