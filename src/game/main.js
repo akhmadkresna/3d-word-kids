@@ -8,7 +8,7 @@ import SPECS from './vehicleSpecs.json';
 
 const $ = (id) => document.getElementById(id);
 const specById = Object.fromEntries(SPECS.map((s) => [s.id, s]));
-const SAVE = 'vroom-stages-v1';
+const SAVE = 'vroom-stages-v2'; // bumped when stage content changed
 const save = (() => { try { return JSON.parse(localStorage.getItem(SAVE)) || {}; } catch { return {}; } })();
 save.stars ||= {}; save.best ||= {};
 const persist = () => { try { localStorage.setItem(SAVE, JSON.stringify(save)); } catch {} };
@@ -89,7 +89,7 @@ async function startStage(n) {
   $('stageNum').textContent = `Stage ${k}`; $('vehName').textContent = spec.name; hintShown = false;
   $('timeBest').textContent = save.best[k] ? `Best ${fmt(save.best[k])}` : `Par ${fmt(def.par)}`;
   $('loading').style.display = 'none'; state = 'ready';
-  setMsg(`${spec.name}<small>Hold <b>GAS</b> to go! · ${def.length} m</small>`);
+  setMsg(`${spec.name}<small>Hold <b>GAS</b> to go! · ${def.length} m<br>☰ Stages (top right) = pick any stage</small>`);
   view.cam.x = stage.start.x + 4;
 }
 function nextStage() { startStage(k >= STAGES.length ? 1 : k + 1); }

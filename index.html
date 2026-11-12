@@ -22,8 +22,9 @@
   #prog .flag { position: absolute; top: -12px; right: -8px; font-size: 24px; }
   #time { top: 12px; right: 12px; font-size: clamp(14px, 2.6vw, 22px); text-align: right; }
   #time small { display: block; opacity: .85; font-weight: 600; font-size: .72em; }
-  .iconbtn { position: fixed; top: 72px; width: 46px; height: 46px; border-radius: 14px; border: 0; background: rgba(15,30,60,.55); color: #fff; font-size: 22px; cursor: pointer; }
-  #menuBtn { right: 12px; } #muteBtn { right: 66px; }
+  #tools { position: fixed; top: 72px; right: 12px; display: flex; gap: 8px; }
+  .iconbtn { height: 46px; min-width: 46px; padding: 0 14px; border-radius: 14px; border: 0; background: rgba(15,30,60,.6); color: #fff; font-family: var(--font); font-size: 20px; font-weight: 800; cursor: pointer; }
+  #menuBtn { background: #1e88e5; font-size: 17px; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
   .big { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom)); border: 0; border-radius: 50%; width: clamp(110px, 22vmin, 190px); height: clamp(110px, 22vmin, 190px); color: #fff; font-family: var(--font); font-weight: 900; cursor: pointer; box-shadow: 0 8px 0 rgba(0,0,0,.28), 0 12px 24px rgba(0,0,0,.3); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: transform .05s, box-shadow .05s; }
   .big span.main { font-size: clamp(26px, 6vmin, 46px); letter-spacing: 1px; }
   .big span.hint { font-size: clamp(11px, 2.2vmin, 15px); opacity: .85; font-weight: 700; }
@@ -56,8 +57,7 @@
 <div class="panel" id="stageBox"><span id="stageNum">Stage 1</span><small id="vehName"></small></div>
 <div class="panel" id="prog"><div class="bar"><div class="fill" id="progFill"></div><div class="car" id="progCar">🚗</div><div class="flag">🏁</div></div></div>
 <div class="panel" id="time"><span id="timeNow">0.0s</span><small id="timeBest"></small></div>
-<button class="iconbtn" id="muteBtn" title="Sound">🔊</button>
-<button class="iconbtn" id="menuBtn" title="Stages">☰</button>
+<div id="tools"><button class="iconbtn" id="muteBtn" title="Sound">🔊</button><button class="iconbtn" id="menuBtn" title="Choose a stage (Esc)">☰ Stages</button></div>
 
 <div id="msg"></div>
 
