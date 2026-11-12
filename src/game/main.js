@@ -74,7 +74,8 @@ async function toggleFullscreen() {
 function syncFs() { document.body.classList.toggle('isfs', !!(document.fullscreenElement || document.webkitFullscreenElement)); view.resize(); }
 document.addEventListener('fullscreenchange', syncFs); document.addEventListener('webkitfullscreenchange', syncFs);
 $('fsBtn').onclick = toggleFullscreen;
-if (navigator.standalone === true || matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches) $('fsBtn').style.display = 'none'; // already an installed full-screen app
+// hide the button only inside an installed Home-Screen app (never merely because the browser is currently full screen)
+if (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches || (matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement && !document.webkitFullscreenElement && !fsRequest)) $('fsBtn').style.display = 'none';
 addEventListener('keydown', (e) => { if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey) { e.preventDefault(); toggleFullscreen(); } });
 
 // ---------- UI ----------

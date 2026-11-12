@@ -499,6 +499,9 @@ export class GameView {
     else { const airK = Math.max(0, Math.min(1, (sim.airT - 0.25) / 0.9)); td += 9 * airK; ty += 2.6 * airK; tx += 3 * airK; } // big air: pull back and look ahead
     if (!sim.dead) { // while the car is in the water the camera stays put so the splash is visible
       this.cam.x += (tx - this.cam.x) * k; this.cam.y += (ty - this.cam.y) * (1 - Math.exp(-dt * 2.2));
+      // safety net: whatever happened (resize, rotation, a long hitch), the vehicle can never drift out of frame
+      const ex = 16 + (this.cam.d - 24) * 0.4, ey = 6 + (this.cam.d - 24) * 0.15;
+      this.cam.x = Math.max(tx - ex, Math.min(tx + ex, this.cam.x)); this.cam.y = Math.max(ty - ey, Math.min(ty + ey, this.cam.y));
     }
     this.cam.d += (td - this.cam.d) * (1 - Math.exp(-dt * 1.5));
     const rum = sim.rumble || 0, shake = (this.shake > 0 ? (this.shake -= dt, Math.sin(now * 90) * this.shake * 0.6) : 0) + Math.sin(now * 63) * 0.11 * rum;
