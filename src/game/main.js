@@ -55,6 +55,22 @@ function doReset() {
 let lastPop = -9, lastTrickDir = 1;
 function pop(text, big = false) { const el = $('pop'); el.textContent = text; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); lastPop = now; }
 
+// ---------- hidden debug panel: tap the stage name 5 times (or open with ?debug) ----------
+const dbgErrors = []; addEventListener('error', (e) => dbgErrors.push(String(e.message).slice(0, 90))); addEventListener('unhandledrejection', (e) => dbgErrors.push(String(e.reason && e.reason.message || e.reason).slice(0, 90)));
+let dbgOn = params.has('debug'), dbgTaps = [], dbgNext = 0; $('dbg').classList.toggle('on', dbgOn);
+$('stageBox').addEventListener('pointerdown', () => { const t = performance.now(); dbgTaps = dbgTaps.filter((x) => t - x < 3000); dbgTaps.push(t); if (dbgTaps.length >= 5) { dbgTaps = []; dbgOn = !dbgOn; $('dbg').classList.toggle('on', dbgOn); } });
+function dbgUpdate(t) {
+  if (!dbgOn || t < dbgNext) return; dbgNext = t + 400;
+  const c = view.renderer.domElement, b = c.getBoundingClientRect(), vv = window.visualViewport, cam = view.camera, gl = view.renderer.getContext();
+  let gpu = ''; try { const ext = gl.getExtension('WEBGL_debug_renderer_info'); gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ''; } catch {}
+  const s = sim, p = s ? s.snapshot() : null;
+  $('dbg').textContent = [`win ${innerWidth}x${innerHeight}  vv ${vv ? Math.round(vv.width) + 'x' + Math.round(vv.height) : '-'}  dpr ${devicePixelRatio}`,
+    `canvas css ${Math.round(b.width)}x${Math.round(b.height)} @(${Math.round(b.left)},${Math.round(b.top)}) buf ${c.width}x${c.height} pr ${view.pr}`,
+    `aspect ${cam.aspect.toFixed(2)}  standalone ${navigator.standalone === true || matchMedia('(display-mode: standalone)').matches}  fs ${!!document.fullscreenElement}`,
+    p ? `car ${p.x.toFixed(1)},${p.y.toFixed(1)}  cam ${view.cam.x.toFixed(1)},${view.cam.y.toFixed(1)} d ${view.cam.d.toFixed(1)}  state ${state}  dead ${p.dead}` : 'no sim',
+    `gl ${gl.isContextLost() ? 'LOST' : 'ok'} ${gpu}`, dbgErrors.length ? `errors(${dbgErrors.length}): ${dbgErrors.slice(-2).join(' | ')}` : 'errors: none'].join('\n');
+}
+
 // ---------- full screen ----------
 const fsRoot = document.documentElement;
 const fsRequest = fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen, fsExit = document.exitFullscreen || document.webkitExitFullscreen;
@@ -215,7 +231,7 @@ function frame(tms) {
     if (!hint && hintShown && state === 'playing') { setMsg(''); hintShown = false; }
     if (sim.dead && state === 'playing') setMsg('💦 Splash!'); else if (state === 'playing' && !hintShown && $('msg').textContent === '💦 Splash!') setMsg('');
   }
-  view.render();
+  view.render(); dbgUpdate(tms);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

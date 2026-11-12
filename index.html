@@ -52,8 +52,11 @@
   @keyframes popin { 0% { opacity: 0; transform: translate(-50%,-30%) scale(.4); } 14% { opacity: 1; transform: translate(-50%,-50%) scale(1.18); } 30% { transform: translate(-50%,-50%) scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-90%) scale(1.05); } }
   #loading { position: fixed; inset: 0; background: linear-gradient(#5eb6ff,#c9ecff); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 34px; font-weight: 900; text-shadow: 0 3px 0 rgba(0,0,0,.25); z-index: 20; }
   #fsBtn .fs-out { display: none; } body.isfs #fsBtn .fs-in { display: none; } body.isfs #fsBtn .fs-out { display: block; }
+  #dbg { display: none; position: fixed; left: 50%; transform: translateX(-50%); top: 76px; margin: 0; padding: 6px 9px; max-width: 62vw; background: rgba(0,0,0,.72); color: #9f9; font: 11px/1.35 ui-monospace, Menlo, monospace; border-radius: 8px; z-index: 60; pointer-events: none; white-space: pre-wrap; }
+  #dbg.on { display: block; }
   #toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: min(86vw, 520px); background: rgba(15,30,60,.88); color: #fff; padding: 12px 18px; border-radius: 16px; font-weight: 700; font-size: clamp(14px, 3vw, 18px); text-align: center; line-height: 1.35; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 40; }
   #toast.show { opacity: 1; }
+  @media (max-height: 470px) { #msg { top: 40%; font-size: clamp(22px, 8vh, 44px); } #msg small { font-size: .38em; margin-top: 6px; } }
   #recExit { display: none; height: 34px; min-width: 34px; border: 0; border-radius: 10px; background: rgba(15,30,60,.35); color: #fff; font-size: 16px; opacity: .45; cursor: pointer; }
   body.rec #recExit { display: block; } body.rec #tools { display: none; }
   #menu { position: fixed; inset: 0; background: rgba(8,20,45,.82); z-index: 30; display: none; overflow: auto; padding: 18px; touch-action: pan-y; }
@@ -85,6 +88,7 @@
 <div id="msg"></div>
 <div id="pop"></div>
 <div id="toast"></div>
+<pre id="dbg"></pre>
 
 <button class="big" id="reset"><span class="main">↺</span><span class="hint">RESET · R</span></button>
 <button class="big" id="gas"><span class="main">GAS</span><span class="hint">hold · SPACE</span></button>

@@ -56,11 +56,19 @@ export class GameView {
     this.stageGroup = new THREE.Group(); this.scene.add(this.stageGroup);
     this.cam = { x: 0, y: 0, d: 24 };
     this.fxPool = null; this.confetti = null; this.running = [];
-    window.addEventListener('resize', () => this.resize()); this.resize();
+    // iOS (especially Home Screen apps) can report a stale size right after launch / rotation, so re-measure a few times and on every layout change
+    const again = () => { this.resize(); setTimeout(() => this.resize(), 120); setTimeout(() => this.resize(), 450); setTimeout(() => this.resize(), 1200); };
+    window.addEventListener('resize', again); window.addEventListener('orientationchange', again); window.addEventListener('pageshow', again);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', again);
+    if (window.ResizeObserver) new ResizeObserver(() => this.resize()).observe(container);
+    this.resize();
   }
   resize() {
-    const w = this.container.clientWidth || window.innerWidth, h = this.container.clientHeight || window.innerHeight;
-    this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+    // the CSS (canvas fills its container) decides the displayed size; the drawing buffer + camera aspect follow the container's real size
+    const r = this.container.getBoundingClientRect(), w = Math.max(2, Math.round(r.width || window.innerWidth)), h = Math.max(2, Math.round(r.height || window.innerHeight)), pr = this.renderer.getPixelRatio();
+    if (w === this._w && h === this._h && pr === this._pr) return;
+    this._w = w; this._h = h; this._pr = pr;
+    this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
   }
 
   /** dynamic resolution: full sharpness while the frame rate holds, step down if it does not, step back up when it recovers */
