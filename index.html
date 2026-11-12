@@ -37,6 +37,9 @@
   #msg small { display: block; font-size: .42em; font-weight: 700; margin-top: 10px; opacity: .95; }
   .stars { font-size: 1.1em; letter-spacing: 6px; }
   #loading { position: fixed; inset: 0; background: linear-gradient(#5eb6ff,#c9ecff); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 34px; font-weight: 900; text-shadow: 0 3px 0 rgba(0,0,0,.25); z-index: 20; }
+  #recExit { display: none; position: fixed; top: 12px; right: 12px; height: 34px; min-width: 34px; border: 0; border-radius: 10px; background: rgba(15,30,60,.35); color: #fff; font-size: 16px; opacity: .45; cursor: pointer; z-index: 5; }
+  body.rec #recExit { display: block; } body.rec #tools { display: none; }
+  body.rec #time { right: 56px; }
   #menu { position: fixed; inset: 0; background: rgba(8,20,45,.82); z-index: 30; display: none; overflow: auto; padding: 18px; touch-action: pan-y; }
   #menu.open { display: block; }
   #menu h2 { color: #fff; margin: 4px 0 4px; font-size: 28px; }
@@ -60,6 +63,7 @@
 <div id="tools"><button class="iconbtn" id="randBtn" title="Random stage">🎲</button><button class="iconbtn" id="muteBtn" title="Sound">🔊</button><button class="iconbtn" id="menuBtn" title="Choose a stage (Esc)">☰ Stages</button></div>
 
 <div id="msg"></div>
+<button id="recExit" title="Stop recording mode">⏹</button>
 
 <button class="big" id="reset"><span class="main">↺</span><span class="hint">RESET · R</span></button>
 <button class="big" id="gas"><span class="main">GAS</span><span class="hint">hold · SPACE</span></button>
@@ -68,6 +72,7 @@
   <button id="menuClose">✕ Close</button>
   <h2>Choose a stage</h2>
   <p>100 stages · new vehicle & obstacles each time · stars for fast times</p>
+  <div class="menurow"><button id="recBtn">🎬 Recording mode</button><button id="recDiffBtn">Difficulty: mixed</button></div>
   <div class="menurow"><button id="restartBtn">↻ Restart this stage</button><button id="randomBtn">🎲 Random stage</button><button id="orderBtn">➡ After a stage: in order</button><button id="musicBtn">🎵 Music: on</button><button id="resetProgress">🗑 Clear stars</button></div>
   <div id="grid"></div>
 </div>

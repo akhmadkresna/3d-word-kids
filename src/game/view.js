@@ -186,7 +186,7 @@ export class GameView {
     await gate(3, false); await gate(stage.finishX, true);
     for (const cp of stage.checkpoints.slice(1)) { const b = await loadModel('racing-kit/bannerTowerRed', { scale: 6.5, center: true }); b.position.set(cp.x, (stage.groundY(cp.x) ?? cp.y), -3.9); G.add(b); }
     for (const [name, x] of [['racing-kit/grandStand', 14], ['racing-kit/tent', 24], ['racing-kit/grandStandCovered', stage.finishX + 10], ['racing-kit/tentLong', stage.finishX + 26]]) {
-      const m = await loadModel(name, { scale: 4.5, center: true }); m.position.set(x, stage.groundY(x) ?? 0, -9); m.rotation.y = Math.PI; G.add(m);
+      const m = await loadModel(name, { scale: 4.5, center: true }); m.position.set(x, stage.groundY(x) ?? 0, -9); m.rotation.y = Math.PI / 2; G.add(m);
     }
     G.traverse((o) => { if (o.isMesh && !o.material.isShaderMaterial) { o.receiveShadow = true; } });
   }

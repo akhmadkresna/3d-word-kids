@@ -26,13 +26,14 @@ export function segLength(s) {
 }
 
 // ease: 1 = intended difficulty, lower = easier fallback when the bot cannot finish
-export function generateStage(k, spec, attempt = 0) {
-  const seed = k * 7919 + attempt * 104729 + 17, rnd = mulberry32(seed);
+export function generateStage(k, spec, attempt = 0, opts = {}) {
+  // opts (recording mode): salt = extra randomness, theme = forced theme, avoid = obstacle types to make rarer, maxLen = cap stage length
+  const seed = k * 7919 + attempt * 104729 + 17 + (opts.salt || 0) * 1299709, rnd = mulberry32(seed);
   const vp = vehiclePhysics(spec), r = Math.min(...vp.axles.map((a) => a.r));
   const boss = k % 10 === 0, ease = Math.max(0.3, 1 - attempt * 0.12);
   const d = Math.min(1, (k / 100 + (boss ? 0.08 : 0))) * ease;
-  const theme = THEMES[(k - 1) % THEMES.length];
-  const target = lerp(170, 520, k / 100) * (boss ? 1.25 : 1) * lerp(0.85, 1.15, rnd());
+  const theme = opts.theme || THEMES[(k - 1) % THEMES.length];
+  const target = Math.min(opts.maxLen || 1e9, lerp(170, 520, k / 100) * (boss ? 1.25 : 1) * lerp(0.85, 1.15, rnd()));
   const avail = Object.keys(UNLOCK).filter((t) => UNLOCK[t] <= k);
   const weights = Object.fromEntries(avail.map((t) => [t, 1]));
   if (theme === 'snow' && weights.ice) weights.ice = 3;
@@ -42,6 +43,7 @@ export function generateStage(k, spec, attempt = 0) {
   if (weights.boostjump) weights.boostjump = 2;
   if (weights.ferry) weights.ferry = 1.5;
   if (weights.drop) weights.drop = 2;
+  for (const t of opts.avoid || []) if (weights[t] && t !== 'jump') weights[t] *= 0.3;
   const pick = () => { const tot = Object.values(weights).reduce((a, b) => a + b, 0); let x = rnd() * tot; for (const [t, w] of Object.entries(weights)) { if ((x -= w) <= 0) return t; } return 'hills'; };
 
   const g = {
