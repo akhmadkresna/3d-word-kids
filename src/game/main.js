@@ -118,6 +118,11 @@ $('menuBtn').onclick = () => { audio.start(); toggleMenu(); };
 $('menuClose').onclick = () => toggleMenu(false);
 $('restartBtn').onclick = () => { toggleMenu(false); restartStage(); };
 $('recBtn').onclick = () => { audio.start(); toggleMenu(false); if (recMode) exitRec(); else enterRec(); };
+$('recTop').onclick = () => { audio.start(); if (!recMode) enterRec(); };
+const recBtnsMode = () => { try { return localStorage.getItem('vroom-recbtns') || 'faint'; } catch { return 'faint'; } };
+const applyRecBtns = () => { const m = params.get('clean') === 'hide' ? 'hidden' : recBtnsMode(); document.body.classList.toggle('recbtns-hidden', m === 'hidden'); $('recBtnsBtn').textContent = `Buttons while recording: ${m === 'hidden' ? 'hidden (keyboard / controller)' : 'faint'}`; };
+$('recBtnsBtn').onclick = () => { try { localStorage.setItem('vroom-recbtns', recBtnsMode() === 'faint' ? 'hidden' : 'faint'); } catch {} applyRecBtns(); };
+applyRecBtns();
 $('recDiffBtn').onclick = () => { const order = ['mixed', 'easy', 'hard']; const cur = recorder ? recorder.diff : (params.get('diff') || 'mixed'); const nx = order[(order.indexOf(cur) + 1) % 3]; if (recorder) recorder.setDifficulty(nx); else params.set('diff', nx); updateRecButtons(); };
 $('recExit').onclick = () => { if (recMode) exitRec(); };
 $('randomBtn').onclick = () => { toggleMenu(false); randomStage(); };
@@ -150,7 +155,7 @@ async function startDef(def) {
   $('stageNum').textContent = recMode ? `🎬 Mix · level ${k}` : `Stage ${k}`; $('vehName').textContent = spec.name; hintShown = false; $('progCar').textContent = spec.dirt || /motorcycle/.test(spec.id) ? '🏍️' : /train/.test(spec.id) ? '🚂' : /(truck|firetruck|garbage|delivery|tractor|van|ambulance)/.test(spec.id) ? '🚚' : /(race|speedster|drag|racer|kart)/.test(spec.id) ? '🏎️' : '🚗';
   $('timeBest').textContent = !recMode && save.best[k] ? `Best ${fmt(save.best[k])}` : `Par ${fmt(def.par)}`;
   $('loading').style.display = 'none'; state = 'ready';
-  setMsg(`${spec.name}<small>Hold <b>GAS</b> to go! · ${def.length} m<br>✈ In the air: <b>hold GAS = flip</b> · let go = land safely${recMode ? '' : '<br>☰ Stages (top right) = pick any stage'}</small>`);
+  if (recMode) { setMsg(`${spec.name}`); const tok = loadToken; setTimeout(() => { if (state === 'ready' && tok === loadToken) setMsg(''); }, 3200); } else setMsg(`${spec.name}<small>Hold <b>GAS</b> to go! · ${def.length} m<br>✈ In the air: <b>hold GAS = flip</b> · let go = land safely${recMode ? '' : '<br>☰ Stages (top right) = pick any stage'}</small>`);
   view.cam.x = stage.start.x + 4 - (stage.trainExtra || 0) * 0.5;
 }
 const startStage = (n) => { recMode = false; document.body.classList.remove('rec'); return startDef(STAGES[Math.max(1, Math.min(STAGES.length, n)) - 1]); };
@@ -168,7 +173,7 @@ function enterRec(diff) {
 }
 function exitRec() { recMode = false; document.body.classList.remove('rec'); updateRecButtons(); startStage(normalK || 1); }
 function updateRecButtons() {
-  $('recBtn').textContent = recMode ? '🎬 Recording mode: ON (tap to stop)' : '🎬 Recording mode: random stages + cars';
+  $('recBtn').textContent = recMode ? '⏹ Stop recording mode' : '🎬 Recording mode — clean screen, random stages & cars';
   $('recDiffBtn').textContent = `Difficulty: ${recorder ? recorder.diff : (params.get('diff') || 'mixed')}`;
 }
 

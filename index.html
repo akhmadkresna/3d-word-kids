@@ -59,17 +59,26 @@
   @media (max-height: 470px) { #msg { top: 40%; font-size: clamp(22px, 8vh, 44px); } #msg small { font-size: .38em; margin-top: 6px; } }
   #recExit { display: none; height: 34px; min-width: 34px; border: 0; border-radius: 10px; background: rgba(15,30,60,.35); color: #fff; font-size: 16px; opacity: .45; cursor: pointer; }
   body.rec #recExit { display: block; } body.rec #tools { display: none; }
-  #menu { position: fixed; inset: 0; background: rgba(8,20,45,.82); z-index: 30; display: none; overflow: auto; padding: 18px; touch-action: pan-y; }
+  /* recording mode = clean screen: no panels, no bars, no counters; only the game, the big popups and two faint buttons */
+  body.rec #stageBox, body.rec #prog, body.rec #starsBox, body.rec #time, body.rec #dbg { display: none; }
+  body.rec .big { opacity: .3; transform: scale(.82); transition: opacity .2s; } body.rec .big.down { opacity: .75; }
+  body.rec.recbtns-hidden .big { display: none; }
+  body.rec #topbar { justify-content: flex-end; }
+  #menu { position: fixed; inset: 0; background: rgba(8,20,45,.9); z-index: 30; display: none; overflow-y: auto; overflow-x: hidden; padding: 0 18px 28px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  #menu, #menu * { touch-action: pan-y; } /* the global 'touch-action: none' (needed for the game buttons) must not block scrolling in here */
+  #menuHead { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -18px 10px; padding: 10px 18px; background: rgba(8,20,45,.97); }
+  #menuHead h2 { margin: 0; }
   #menu.open { display: block; }
-  #menu h2 { color: #fff; margin: 4px 0 4px; font-size: 28px; }
+  #menu h2 { color: #fff; font-size: 26px; }
   #menu p { color: #bcd; margin: 0 0 14px; }
   #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 10px; max-width: 1100px; margin: 0 auto; }
   #grid button { border: 0; border-radius: 14px; padding: 10px 4px 8px; background: #1e88e5; color: #fff; font-family: var(--font); font-weight: 900; font-size: 22px; cursor: pointer; line-height: 1.1; touch-action: manipulation; }
   #grid button small { display: block; font-size: 11px; font-weight: 600; opacity: .9; height: 14px; overflow: hidden; }
   #grid button .st { display: block; font-size: 13px; letter-spacing: 1px; color: #ffe066; min-height: 16px; }
   #grid button.cur { outline: 4px solid #ffeb3b; } #grid button.done { background: #2e9e5b; }
-  #menuClose { position: sticky; top: 0; float: right; border: 0; border-radius: 12px; background: #ff5252; color: #fff; font-size: 20px; font-weight: 900; padding: 10px 16px; cursor: pointer; touch-action: manipulation; }
+  #menuClose { flex: 0 0 auto; border: 0; border-radius: 12px; background: #ff5252; color: #fff; font-size: 20px; font-weight: 900; padding: 10px 16px; cursor: pointer; touch-action: manipulation; }
   .menurow { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .menurow button.bigrec { background: linear-gradient(90deg, #ff4081, #ff9100); color: #fff; font-size: 18px; padding: 14px 20px; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
   .menurow button { border: 0; border-radius: 12px; background: #ffb300; color: #222; font-family: var(--font); font-weight: 800; font-size: 16px; padding: 10px 16px; cursor: pointer; touch-action: manipulation; }
 </style>
 </head>
@@ -81,7 +90,7 @@
   <div class="panel" id="prog"><div class="bar"><div class="fill" id="progFill"></div><div class="car" id="progCar">🚗</div><div class="flag">🏁</div></div></div>
   <div class="panel" id="starsBox">⭐ <span id="starNow">0</span>/<span id="starTot">0</span> · 🌀 <span id="flipNow">0</span></div>
   <div class="panel" id="time"><span id="timeNow">0.0s</span><small id="timeBest"></small></div>
-  <div id="tools"><button class="iconbtn" id="todBtn" title="Day / night">🌗</button><button class="iconbtn" id="randBtn" title="Random stage">🎲</button><button class="iconbtn" id="fsBtn" title="Full screen (F)"><svg class="fs-in" viewBox="0 0 24 24" width="22" height="22"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="fs-out" viewBox="0 0 24 24" width="22" height="22"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="iconbtn" id="muteBtn" title="Sound">🔊</button><button class="iconbtn" id="menuBtn" title="Choose a stage (Esc)">☰ Stages</button></div>
+  <div id="tools"><button class="iconbtn" id="recTop" title="Recording mode: clean screen, random stages and cars">🎬</button><button class="iconbtn" id="todBtn" title="Day / night">🌗</button><button class="iconbtn" id="randBtn" title="Random stage">🎲</button><button class="iconbtn" id="fsBtn" title="Full screen (F)"><svg class="fs-in" viewBox="0 0 24 24" width="22" height="22"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="fs-out" viewBox="0 0 24 24" width="22" height="22"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="iconbtn" id="muteBtn" title="Sound">🔊</button><button class="iconbtn" id="menuBtn" title="Choose a stage (Esc)">☰ Stages</button></div>
   <button id="recExit" title="Stop recording mode">⏹</button>
 </div>
 
@@ -94,10 +103,10 @@
 <button class="big" id="gas"><span class="main">GAS</span><span class="hint">hold · SPACE</span></button>
 
 <div id="menu">
-  <button id="menuClose">✕ Close</button>
-  <h2>Choose a stage</h2>
+  <div id="menuHead"><h2>Choose a stage</h2><button id="menuClose">✕ Close</button></div>
   <p>100 stages · new vehicle & obstacles each time · stars for fast times</p>
-  <div class="menurow"><button id="recBtn">🎬 Recording mode</button><button id="recDiffBtn">Difficulty: mixed</button></div>
+  <div class="menurow"><button id="recBtn" class="bigrec">🎬 Recording mode — clean screen, random stages &amp; cars</button></div>
+  <div class="menurow"><button id="recDiffBtn">Difficulty: mixed</button><button id="recBtnsBtn">Buttons while recording: faint</button></div>
   <div class="menurow"><button id="restartBtn">↻ Restart this stage</button><button id="randomBtn">🎲 Random stage</button><button id="orderBtn">➡ After a stage: in order</button><button id="musicBtn">🎵 Music: on</button><button id="resetProgress">🗑 Clear stars</button></div>
   <div id="grid"></div>
 </div>
