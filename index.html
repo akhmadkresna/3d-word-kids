@@ -24,6 +24,7 @@
   #prog .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg,#69f0ae,#ffeb3b); border-radius: 8px; }
   #prog .car { position: absolute; top: -9px; left: 0; font-size: 22px; transform: translateX(-50%); }
   #prog .flag { position: absolute; top: -12px; right: -8px; font-size: 24px; }
+  #starsBox { font-size: clamp(13px, 2.4vw, 20px); white-space: nowrap; }
   #time { font-size: clamp(13px, 2.4vw, 20px); text-align: right; min-width: 78px; }
   #time small { display: block; opacity: .85; font-weight: 600; font-size: .72em; }
   #tools { display: flex; gap: 6px; }
@@ -63,6 +64,7 @@
 <div id="topbar">
   <div class="panel" id="stageBox"><span id="stageNum">Stage 1</span><small id="vehName"></small><div class="dmg" title="Damage"><i id="dmgFill"></i></div></div>
   <div class="panel" id="prog"><div class="bar"><div class="fill" id="progFill"></div><div class="car" id="progCar">🚗</div><div class="flag">🏁</div></div></div>
+  <div class="panel" id="starsBox">⭐ <span id="starNow">0</span>/<span id="starTot">0</span></div>
   <div class="panel" id="time"><span id="timeNow">0.0s</span><small id="timeBest"></small></div>
   <div id="tools"><button class="iconbtn" id="randBtn" title="Random stage">🎲</button><button class="iconbtn" id="muteBtn" title="Sound">🔊</button><button class="iconbtn" id="menuBtn" title="Choose a stage (Esc)">☰ Stages</button></div>
   <button id="recExit" title="Stop recording mode">⏹</button>

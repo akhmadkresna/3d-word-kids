@@ -134,10 +134,10 @@ function onFinish(e) {
 function renderFinish(t, st) {
   if (recMode) {
     const nx = recorder && recorder.nextDef ? specById[recorder.nextDef.vehicle].name : '…';
-    setMsg(`STAGE COMPLETE!<span class="stars">${starStr(st)}</span>${fmt(t)}<small>Next: ${nx} · auto in ${Math.ceil(countdown)} · or press GAS</small>`); return;
+    setMsg(`STAGE COMPLETE!<span class="stars">${starStr(st)}</span>${fmt(t)}<small>⭐ ${sim.starsGot}/${sim.starsTotal} · Next: ${nx} · auto in ${Math.ceil(countdown)} · or press GAS</small>`); return;
   }
   const last = k >= STAGES.length && save.order !== 'random';
-  setMsg(`${last ? '🏆 ALL 100 STAGES! 🏆' : 'STAGE COMPLETE!'}<span class="stars">${starStr(st)}</span>${fmt(t)}<small>${last ? 'Press GAS to start again' : `Press GAS for next stage · auto in ${Math.ceil(countdown)}`} · RESET to replay</small>`);
+  setMsg(`${last ? '🏆 ALL 100 STAGES! 🏆' : 'STAGE COMPLETE!'}<span class="stars">${starStr(st)}</span>${fmt(t)}<small>⭐ ${sim.starsGot}/${sim.starsTotal}<br>${last ? 'Press GAS to start again' : `Press GAS for next stage · auto in ${Math.ceil(countdown)}`} · RESET to replay</small>`);
 }
 
 // ---------- main loop ----------
@@ -161,6 +161,7 @@ function frame(tms) {
     if (acc > DT * 6) acc = 0;
     view.update(sim, now, dt);
     audio.engine(sim.throttle, sim.speed, !sim.dead, sim.damage);
+    $('starNow').textContent = sim.starsGot; $('starTot').textContent = sim.starsTotal;
     $('dmgFill').style.width = `${Math.round(sim.damage * 100)}%`; $('dmgFill').style.background = `hsl(${Math.round(120 - 120 * sim.damage)},80%,55%)`;
 
     const def = curDef, prog = Math.max(0, Math.min(1, sim.x / stage.finishX));

@@ -10,6 +10,13 @@ export function buildStage(def) {
   const rng = mulberry32(def.seed || 1);
   const S = { def, pieces: [], walls: [], props: [], pads: [], pits: [], blocks: [], checkpoints: [] };
   let x = 0, y = 0, cur = { surface: 'grass', pts: [[0, 0]] }, lastCp = -999;
+  // collectibles: stars + balloons. Line/balloon requests are resolved once the ground height is known.
+  S.collectibles = []; const lineReqs = [], balloonReqs = [], crng = mulberry32((def.seed || 1) + 4242);
+  const addStar = (px, py) => S.collectibles.push({ type: 'star', x: px, y: py });
+  const starLine = (x0, x1, hover = 1.7, step = 6.5) => lineReqs.push({ x0, x1, hover, step });
+  const balloons = (x0, x1, n) => balloonReqs.push({ x0, x1, n });
+  // a trail of stars along the arc a vehicle flies over a gap/cliff
+  const starArc = (x0, y0, x1, y1, height, n) => { for (let i = 1; i <= n; i++) { const t = i / (n + 1); addStar(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + height * 4 * t * (1 - t)); } };
 
   const push = (nx, ny) => { cur.pts.push([nx, ny]); x = nx; y = ny; };
   const piece = (surface) => { if (cur.pts.length > 1) S.pieces.push(cur); cur = { surface, pts: [[x, y]] }; };
@@ -36,11 +43,28 @@ export function buildStage(def) {
     logs: (s) => { for (let i = 0; i < s.n; i++) { flat(s.gap ?? 6); S.blocks.push({ x: x + 0.35, y: y + s.h / 2, w: 0.7, h: s.h }); flat(1.2); } flat(3); },
     steps: (s) => { for (let i = 0; i < s.n; i++) { push(x, y + s.h); flat(s.run); } flat(2); },
     jump: (s) => { // runup, kicker ramp, pit, landing
-      flat(s.runup); profile(s.rampLen, (t) => s.rise * t); pit(s.w, s.landDy); flat(10);
+      flat(s.runup); profile(s.rampLen, (t) => s.rise * t); const r = pit(s.w, s.landDy); flat(10);
+      starArc(r.lipX, r.lipY, r.landX, r.landY, 2.6 + s.w * 0.16, 4 + Math.floor(s.w / 3));
+    },
+    mountain: (s) => { // HIGH CLIMB: long smooth climb, summit plateau with a big star, then down (optionally off a cliff)
+      flat(6); profile(s.up, (t) => s.h * sm(t)); flat(s.plateau);
+      addStar(x - s.plateau / 2, y + 2.6); addStar(x - s.plateau / 2 - 2.5, y + 1.8); addStar(x - s.plateau / 2 + 2.5, y + 1.8);
+      if (s.cliff) { push(x, y - s.cliff); flat(4); profile(s.down, (t) => -(s.h - s.cliff) * sm(t)); } else profile(s.down, (t) => -s.h * sm(t));
+      flat(4);
+    },
+    skijump: (s) => { // very tall kicker, cliff drop into a landing zone far below, then a long ramp back up
+      flat(s.runup); profile(s.rampLen, (t) => s.rise * t); const lipX = x, lipY = y; push(x, y - s.drop); flat(8);
+      const L = 20 + s.rise * 2.6; for (let i = 1; i <= 8; i++) { const t = i / 9; addStar(lipX + L * t, lipY + (s.rise * 0.55 + 2.8) * 4 * t * (1 - t) - s.drop * t * t * 0.7); }
+      profile((s.drop - s.rise) * 4.5, (t) => (s.drop - s.rise) * sm(t)); flat(4);
+    },
+    roller: (s) => { // roller-coaster hills: big rounded crests = airtime
+      for (let i = 0; i < s.n; i++) { addStar(x + s.w / 2, y + s.amp + 2.6); profile(s.w, (t) => s.amp * Math.pow(Math.sin(Math.PI * t), 1.6)); }
+      flat(3);
     },
     boostjump: (s) => { // boost pad -> ramp -> very wide gap
       flat(s.runup); S.pads.push({ type: 'boost', x0: x, x1: x + s.boostLen, y }); flat(s.boostLen, 'boost'); flat(3);
-      profile(s.rampLen, (t) => s.rise * t); pit(s.w, s.landDy); flat(10);
+      profile(s.rampLen, (t) => s.rise * t); const r = pit(s.w, s.landDy); flat(10);
+      starArc(r.lipX, r.lipY, r.landX, r.landY, 3 + s.w * 0.16, 5 + Math.floor(s.w / 3));
     },
     ferry: (s) => { // gap crossed on a moving platform: wait for it to dock, then drive on
       flat(s.runup); const r = pit(s.w, 0);
@@ -66,7 +90,11 @@ export function buildStage(def) {
   };
 
   flat(20); // start area
-  for (const seg of def.segs) { SEG[seg.t](seg); checkpoint(); }
+  for (const seg of def.segs) {
+    const x0 = x; SEG[seg.t](seg); checkpoint();
+    if (seg.t !== 'flat') { starLine(x0 + 3, x - 3); if (crng() < 0.7 && seg.t !== 'ferry') balloons(x0 + 4, x - 4, 3 + Math.floor(crng() * 3)); }
+    else if (seg.len > 14) starLine(x0 + 2, x - 2, 1.6, 7);
+  }
   flat(8); const finishX = x; flat(22); piece('grass');
   S.pieces.push(cur);
 
@@ -82,6 +110,15 @@ export function buildStage(def) {
     }
     return null;
   };
+  for (const r of lineReqs) for (let px = r.x0; px <= r.x1; px += r.step) { const gy = S.groundY(px); if (gy != null) addStar(px, gy + r.hover); }
+  for (const r of balloonReqs) for (let i = 0; i < r.n; i++) {
+    const px = r.x0 + ((r.x1 - r.x0) * (i + 0.5)) / r.n, gy = S.groundY(px); if (gy == null) continue;
+    S.collectibles.push({ type: 'balloon', x: px, y: gy + (crng() < 0.7 ? 1.7 + crng() * 1.2 : 4.2 + crng() * 2.2), ci: Math.floor(crng() * 6) });
+  }
+  // keep it readable: at most ~85 stars per stage (balloons are always kept)
+  const starIdx = S.collectibles.map((c, i) => (c.type === 'star' ? i : -1)).filter((i) => i >= 0);
+  if (starIdx.length > 85) { const drop = new Set(); const stepK = starIdx.length / 85; let acc = 0; starIdx.forEach((i) => { acc += 1; if (acc >= stepK) acc -= stepK; else drop.add(i); }); S.collectibles = S.collectibles.filter((c, i) => !drop.has(i)); }
+  S.collectibles.sort((a, b) => a.x - b.x);
   S.start = { x: 7, y: S.groundY(7) };
   S.checkpoints.unshift({ x: 7, y: S.start.y });
   S.finishX = finishX; S.length = x;

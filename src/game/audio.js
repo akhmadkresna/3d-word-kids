@@ -51,6 +51,13 @@ export class GameAudio {
       case 'splash': this._noise(1.0, { lp: 2500, hp: 400, gain: 0.8 }); this._tone(300, 0.4, { gain: 0.3, slide: -180 }); [0.5, 0.7, 0.9].forEach((w, i) => this._tone(330 + i * 70, 0.12, { gain: 0.2, slide: 300, when: w })); break;
       case 'boost': this._noise(0.6, { lp: 6000, hp: 1200, gain: 0.35 }); this._tone(300, 0.4, { type: 'sawtooth', gain: 0.12, slide: 500 }); break;
       case 'spring': this._tone(180, 0.35, { type: 'triangle', gain: 0.4, slide: 700 }); break;
+      case 'collect': {
+        const now = this.ctx.currentTime; this.combo = now - (this.lastCollect || -9) < 1.3 ? Math.min(7, (this.combo || 0) + 1) : 0; this.lastCollect = now;
+        const f = 660 * Math.pow(2, [0, 2, 4, 7, 9, 12, 14, 16][this.combo] / 12);
+        if (e.kind === 'balloon') { this._noise(0.12, { lp: 5000, hp: 800, gain: 0.45 }); this._tone(f * 0.8, 0.12, { type: 'triangle', gain: 0.25, slide: -200 }); }
+        else { this._tone(f, 0.18, { type: 'triangle', gain: 0.28 }); this._tone(f * 2, 0.22, { type: 'sine', gain: 0.13, when: 0.04 }); }
+        break;
+      }
       case 'checkpoint': this._tone(880, 0.12, { gain: 0.25 }); this._tone(1320, 0.25, { gain: 0.25, when: 0.1 }); break;
       case 'reset': this._tone(500, 0.08, { gain: 0.25, type: 'square' }); this._tone(300, 0.1, { gain: 0.25, type: 'square', when: 0.08 }); break;
       case 'finish': [523, 659, 784, 1047].forEach((f, i) => this._tone(f, i === 3 ? 0.9 : 0.14, { type: 'square', gain: 0.16, when: i * 0.12 })); this._noise(2.2, { lp: 3500, hp: 500, gain: 0.3 }); break;

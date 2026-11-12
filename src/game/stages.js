@@ -3,7 +3,7 @@ import { mulberry32 } from './terrain.js';
 import { vehiclePhysics, GRAVITY } from './vehicleClass.js';
 
 export const THEMES = ['meadow', 'desert', 'snow', 'sunset', 'candy', 'night'];
-const UNLOCK = { hills: 1, bumps: 1, jump: 1, boost: 2, slope: 4, crates: 6, drop: 8, barrels: 8, boostjump: 12, pins: 14, balls: 16, logs: 18, ice: 20, ferry: 20, seesaw: 24, spring: 28, steps: 30, mud: 34 };
+const UNLOCK = { hills: 1, bumps: 1, jump: 1, mountain: 1, roller: 3, skijump: 5, boost: 2, slope: 4, crates: 6, drop: 8, barrels: 8, boostjump: 12, pins: 14, balls: 16, logs: 18, ice: 20, ferry: 20, seesaw: 24, spring: 28, steps: 30, mud: 34 };
 const lerp = (a, b, t) => a + (b - a) * t;
 
 export function segLength(s) {
@@ -17,6 +17,9 @@ export function segLength(s) {
     case 'boostjump': return s.runup + s.boostLen + 3 + s.rampLen + s.w + 10;
     case 'ferry': return s.runup + s.w + 14;
     case 'drop': return s.len + s.h * 4.5 + 10;
+    case 'mountain': return 10 + s.up + s.plateau + s.down + 4;
+    case 'skijump': return s.runup + s.rampLen + 12 + (s.drop - s.rise) * 4.5 + 4;
+    case 'roller': return s.n * s.w + 3;
     case 'crates': return s.cols * s.size + 6;
     case 'barrels': return 8; case 'pins': return s.n * 1.3 + 6; case 'balls': return 12;
     case 'seesaw': return s.len + 6; case 'boost': return s.len + 4; case 'spring': return 12;
@@ -33,16 +36,17 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
   const boss = k % 10 === 0, ease = Math.max(0.3, 1 - attempt * 0.12);
   const d = Math.min(1, (k / 100 + (boss ? 0.08 : 0))) * ease;
   const theme = opts.theme || THEMES[(k - 1) % THEMES.length];
-  const target = Math.min(opts.maxLen || 1e9, lerp(170, 520, k / 100) * (boss ? 1.25 : 1) * lerp(0.85, 1.15, rnd()));
+  const target = Math.min(opts.maxLen || 1e9, lerp(250, 560, k / 100) * (boss ? 1.2 : 1) * lerp(0.85, 1.15, rnd()));
   const avail = Object.keys(UNLOCK).filter((t) => UNLOCK[t] <= k);
   const weights = Object.fromEntries(avail.map((t) => [t, 1]));
   if (theme === 'snow' && weights.ice) weights.ice = 3;
   if (theme === 'desert' && weights.mud) weights.mud = 2;
   if (k < 10) { weights.hills = 2; weights.bumps = 1; }
-  weights.jump = k < 10 ? 5 : 4; // jumps over gaps are the signature obstacle
+  weights.jump = k < 10 ? 3 : 2.5; // jumps over gaps are the signature obstacle
   if (weights.boostjump) weights.boostjump = 2;
   if (weights.ferry) weights.ferry = 1.5;
   if (weights.drop) weights.drop = 2;
+  weights.mountain = 1.1; if (weights.roller) weights.roller = 2.5; if (weights.skijump) weights.skijump = 2;
   for (const t of opts.avoid || []) if (weights[t] && t !== 'jump') weights[t] *= 0.3;
   const pick = () => { const tot = Object.values(weights).reduce((a, b) => a + b, 0); let x = rnd() * tot; for (const [t, w] of Object.entries(weights)) { if ((x -= w) <= 0) return t; } return 'hills'; };
 
@@ -69,6 +73,15 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
     },
     ferry() { return { t: 'ferry', runup: 24, w: +lerp(14, 18, rnd()).toFixed(1), len: 10 }; },
     drop() { return { t: 'drop', len: +lerp(8, 14, rnd()).toFixed(1), h: +(lerp(2.5, 7, d) * (0.8 + rnd() * 0.4)).toFixed(1) }; },
+    mountain() { // peak slope = 1.5*h/up ~= 0.5 (27 deg), which every vehicle class climbs in the bot tests
+      const h = +(lerp(14, 46, Math.pow(d, 0.8)) * (0.85 + rnd() * 0.3)).toFixed(1), cliff = d > 0.4 && rnd() < 0.4 ? +(h * 0.35).toFixed(1) : 0;
+      return { t: 'mountain', h, up: +(h * 3).toFixed(1), plateau: +lerp(5, 9, rnd()).toFixed(1), cliff, down: +((h - cliff) * 3.3).toFixed(1) };
+    },
+    skijump() {
+      const rise = +(lerp(4, 8, d) * (0.85 + rnd() * 0.3)).toFixed(1), drop = +(rise * 1.15 + lerp(2, 5, d)).toFixed(1);
+      return { t: 'skijump', runup: +lerp(28, 36, rnd()).toFixed(1), rampLen: +(rise / 0.55).toFixed(1), rise, drop };
+    },
+    roller() { return { t: 'roller', n: 3 + Math.floor(d * 3), w: +lerp(22, 32, rnd()).toFixed(1), amp: +(lerp(2.5, 4.8, d) * (0.85 + rnd() * 0.3)).toFixed(1) }; },
     seesaw() { return { t: 'seesaw', len: 9 }; },
     boost() { return { t: 'boost', len: +lerp(8, 14, rnd()).toFixed(1) }; },
     spring() { return { t: 'spring' }; },
@@ -76,12 +89,18 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
     mud() { return { t: 'mud', len: +lerp(14, 28, rnd()).toFixed(1) }; },
   };
 
-  const segs = []; let total = 20 + 30, drift = 0, last = '', first = true;
+  const segs = []; let total = 20 + 30, drift = 0, last = '', first = true, second = false;
   while (total < target) {
-    const gap = +lerp(10, 24, rnd() * (1 - d * 0.4)).toFixed(1); segs.push({ t: 'flat', len: gap }); total += gap;
-    let type = first ? 'jump' : pick(); // every stage opens with a ramp jump
-    if (!first && type === last && rnd() < 0.7) type = pick(); last = type; first = false;
+    const gap = +lerp(8, 18, rnd() * (1 - d * 0.4)).toFixed(1);
+    // never a boring flat road: most gaps between obstacles are gently rolling hills
+    if (rnd() < 0.5) { const waves = gap > 14 ? 2 : 1; segs.push({ t: 'hills', len: gap, amp: +Math.min(lerp(0.5, 1.3, rnd()), (0.55 * gap) / (Math.PI * 2 * waves)).toFixed(2), waves }); } else segs.push({ t: 'flat', len: gap });
+    total += gap + 3;
+    let type = first ? 'jump' : second ? 'mountain' : pick(); // every stage opens with a ramp jump, then a HIGH CLIMB
+    if (!first && type === last && rnd() < 0.7) type = pick(); last = type; second = first; first = false;
     let s = g[type]();
+    if (s.t === 'mountain') { // keep the stage length sane: a tall climb needs ~6.3 m of track per metre of height
+      const room = Math.max(8, (target - total) / 6.4); if (s.h > room) { const h = +room.toFixed(1), cliff = s.cliff ? +(h * 0.35).toFixed(1) : 0; s = { ...s, h, up: +(h * 3).toFixed(1), cliff, down: +((h - cliff) * 3.3).toFixed(1) }; }
+    }
     if (s.t === 'slope') { if (drift > 10 && s.dy > 0) s.dy = -s.dy; if (drift < -10 && s.dy < 0) s.dy = -s.dy; drift += s.dy; }
     if (s.t === 'jump') drift += s.rise + s.landDy;
     segs.push(s); total += segLength(s);

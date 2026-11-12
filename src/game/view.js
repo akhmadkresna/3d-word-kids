@@ -75,6 +75,7 @@ export class GameView {
     this._clouds(style); this._hills(style); if (style.stars) this._stars();
     this._terrain(stage, style, G);
     await this._props(stage, G);
+    this._collectibles(stage, G);
     await this._decor(stage, style, G);
     await this._vehicle(spec, vp);
     this._fx();
@@ -166,6 +167,25 @@ export class GameView {
     }
   }
 
+  _collectibles(stage, G) {
+    // gold stars (extruded 5-point shape) and coloured balloons; shared geometry/materials
+    const sh = new THREE.Shape(), R = 0.62, r = 0.28;
+    for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + (i * Math.PI) / 5, rad = i % 2 ? r : R; const px = Math.cos(a) * rad, py = Math.sin(a) * rad; i ? sh.lineTo(px, py) : sh.moveTo(px, py); }
+    sh.closePath();
+    const starGeo = new THREE.ExtrudeGeometry(sh, { depth: 0.22, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, bevelSegments: 1 }); starGeo.translate(0, 0, -0.11);
+    const starMat = new THREE.MeshStandardMaterial({ color: 0xffc400, emissive: 0xff9800, emissiveIntensity: 0.55, roughness: 0.35, metalness: 0.3 });
+    const balGeo = new THREE.SphereGeometry(0.62, 14, 12), knotGeo = new THREE.ConeGeometry(0.12, 0.22, 8), stringGeo = new THREE.CylinderGeometry(0.015, 0.015, 1.3, 4);
+    const strMat = new THREE.MeshBasicMaterial({ color: 0xffffff }), colors = [0xff4081, 0xffeb3b, 0x40c4ff, 0x69f0ae, 0xff9100, 0xb388ff], balMats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.25 }));
+    this.collectMeshes = [];
+    for (const c of stage.collectibles) {
+      const g = new THREE.Group();
+      if (c.type === 'star') { const m = new THREE.Mesh(starGeo, starMat); m.castShadow = false; g.add(m); }
+      else { const b = new THREE.Mesh(balGeo, balMats[c.ci % 6]); b.scale.set(0.9, 1.12, 0.9); const k = new THREE.Mesh(knotGeo, balMats[c.ci % 6]); k.position.y = -0.74; k.rotation.x = Math.PI; const st = new THREE.Mesh(stringGeo, strMat); st.position.y = -1.4; g.add(b, k, st); }
+      g.position.set(c.x, c.y, 0); g.userData.noShadow = true; g.traverse((o) => { o.userData.noShadow = true; }); G.add(g);
+      this.collectMeshes.push(g);
+    }
+  }
+
   async _decor(stage, style, G) {
     const r = mulberry32(stage.def.seed + 5), end = stage.length;
     const addTree = async (name, x, y, z, sc) => {
@@ -240,9 +260,9 @@ export class GameView {
     this.si = 0; this.mi = 0;
   }
 
-  _puff(now, x, y, vx, vy, life, s0, s1, fire, d) {
+  _puff(now, x, y, vx, vy, life, s0, s1, fire, d, tint = null) {
     const p = this.puffs[this.pi++ % this.puffs.length];
-    Object.assign(p, { t0: now, life, x, y, vx, vy, s0, s1, fire, d });
+    Object.assign(p, { t0: now, life, x, y, vx, vy, s0, s1, fire, d, tint });
   }
   _debris(e, now) {
     const n = Math.min(10, 2 + Math.floor(e.hit * 26)), palette = [0x2b2b2b, 0x6e6e6e, 0xbdbdbd, 0xff7043, 0xffd54a];
@@ -255,6 +275,10 @@ export class GameView {
   }
   event(e, now) {
     if (e.type === 'bump' && e.hit > 0.03) this._debris(e, now);
+    if (e.type === 'collect') { // sparkle burst
+      const cols = e.kind === 'balloon' ? [0xff4081, 0xffeb3b, 0x40c4ff, 0x69f0ae] : [0xffe066, 0xfff3a0, 0xffc400];
+      for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2 + Math.random(); this._puff(now, e.x, e.y, Math.cos(a) * (2 + Math.random() * 3), Math.sin(a) * (2 + Math.random() * 3), 0.5, 0.18, 0.5, false, 0, cols[i % cols.length]); }
+    }
     if (e.type === 'splash') { const s = this.splashes[this.si++ % this.splashes.length]; s.t0 = now; s.o.set(e.x, e.y, 0); s.y = e.y; }
     else if (e.type === 'bump' && e.power > 0.35 || e.type === 'spring' || e.type === 'boost') { const s = this.smokes[this.mi++ % this.smokes.length]; s.t0 = now; s.o.set(e.x, e.y - 0.6, 0.5); }
     else if (e.type === 'finish') {
@@ -295,6 +319,12 @@ export class GameView {
     for (const s2 of this.splashes) s2.fn(now - s2.t0, s2.o, s2.y);
     for (const s2 of this.smokes) s2.fn(now - s2.t0, s2.o);
     this._damageFx(sim, now, dt, snap);
+    if (this.collectMeshes) sim.collect.forEach((c, i) => {
+      const g = this.collectMeshes[i]; if (!g) return;
+      g.visible = !c.got; if (c.got) return;
+      g.position.y = c.y + Math.sin(now * 2 + i) * 0.14;
+      if (c.type === 'star') g.rotation.y = now * 2.4 + i; else g.rotation.z = Math.sin(now * 1.6 + i) * 0.12;
+    });
     if (this.confetti) { this.confetti.fn(now - this.confetti.t0); }
   }
 
@@ -322,7 +352,8 @@ export class GameView {
       const k = age / p.life;
       p.m.visible = true; p.m.position.set(p.x + p.vx * age, p.y + p.vy * age + 0.4 * age * age, 0.5);
       p.m.scale.setScalar(p.s0 + (p.s1 - p.s0) * k);
-      if (p.fire) { p.m.material.color.copy(fireA).lerp(fireB, k); p.m.material.opacity = 0.95 * (1 - k); }
+      if (p.tint != null) { p.m.material.color.setHex(p.tint); p.m.material.opacity = 0.95 * (1 - k) ** 1.5; }
+      else if (p.fire) { p.m.material.color.copy(fireA).lerp(fireB, k); p.m.material.opacity = 0.95 * (1 - k); }
       else { p.m.material.color.copy(smokeLight).lerp(smokeDark, Math.min(1, p.d * 1.25)); p.m.material.opacity = 0.6 * (1 - k) ** 1.2 * (0.55 + p.d * 0.45); }
     }
     for (const p of this.debris) {

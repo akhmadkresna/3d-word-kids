@@ -12,6 +12,11 @@ Built to play with kids — and to record: one video can cover many stages (the 
 Extras: the **☰ Stages** button (or `Esc`) opens the stage picker (any stage, restart, music on/off). **🎲** jumps to a random stage, and the menu can switch auto-advance between *in order* and *random* (handy for recording). Direct link to a stage: `…/#37`.
 Finish a stage → ★ rating by time (par is based on a test bot) → next stage starts automatically (or press GAS).
 
+## What makes a track fun (for 2-5 year olds)
+No boring flat roads: the ground between obstacles rolls, and **every stage has a ramp jump and a HIGH CLIMB** (a mountain from 13 m on stage 1 up to ~50 m, sometimes ending in a cliff).
+⭐ **Stars and 🎈 balloons** float along every track (over jumps, up mountains, on hill crests); drive through them for a sparkle + a rising "ding" combo. The counter is in the top bar.
+Also: tall **ski jumps** into cliff landings, **roller-coaster hills** for airtime, boost-pad long jumps, ferries, springs, drops, ice, mud and more.
+
 ## Damage
 Every knock adds damage in proportion to how hard it was (soft landing ≈ 3–6 %, hard crash up to 35 %). The meter under the stage name shows it, and the vehicle shows it:
 smoke that gets thicker and darker, fire above ~60 %, a sooty crumpled body, a wobbly wheel, debris flying off, and a sputtering engine. It is cosmetic only (stages stay solvable).

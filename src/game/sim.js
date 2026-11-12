@@ -29,6 +29,7 @@ export class Sim {
     this.world = new World({ gravity: new Vec2(0, -GRAVITY) });
     this.events = []; this.time = 0; this.resets = 0; this.finished = false; this.finishTime = null;
     this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.throttle = 0; this.cpIndex = 0; this.hint = false;
+    this.collect = stage.collectibles.map((c) => ({ ...c, got: false })); this.starsGot = 0; this.starsTotal = this.collect.length;
     this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.props = []; this.maxX = 0;
     this._buildTerrain(); this._buildProps(); this._buildCar(); this.reset(true);
   }
@@ -177,6 +178,15 @@ export class Sim {
     }
     this.prevV = new Vec2(v2.x, v2.y);
     this.maxX = Math.max(this.maxX, pos.x);
+    // stars + balloons: grabbed by the vehicle body or either wheel (generous radius, kids are small!)
+    const reach = vp.chassis.hx * 0.7 + 0.9;
+    for (const c of this.collect) {
+      if (c.got || c.x < pos.x - 6) continue;
+      if (c.x > pos.x + 6) break;
+      let near = Math.hypot(c.x - pos.x, c.y - pos.y) < reach;
+      for (let i = 0; i < this.wheels.length && !near; i++) { const q = this.wheels[i].body.getPosition(); near = Math.hypot(c.x - q.x, c.y - q.y) < this.wheels[i].r + 1.1; }
+      if (near) { c.got = true; this.starsGot++; this.events.push({ type: 'collect', kind: c.type, ci: c.ci, x: c.x, y: c.y }); }
+    }
     while (this.cpIndex + 1 < this.stage.checkpoints.length && pos.x > this.stage.checkpoints[this.cpIndex + 1].x) { this.cpIndex++; this.events.push({ type: 'checkpoint', x: pos.x, y: pos.y }); }
     if (!this.finished && pos.x >= this.stage.finishX) { this.finished = true; this.finishTime = this.time; this.events.push({ type: 'finish', time: this.time, x: pos.x, y: pos.y }); }
 
