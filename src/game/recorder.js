@@ -24,7 +24,7 @@ export class Recorder {
     let vs = SPECS.filter((s) => !s.carriage && !h.veh.slice(-14).includes(s.id));
     const diffClass = vs.filter((s) => classify(s).cls !== h.cls[h.cls.length - 1]);
     if (diffClass.length) vs = diffClass;
-    const spec = pick(vs.length ? vs : SPECS.filter((s) => !s.carriage));
+    const pool = (vs.length ? vs : SPECS.filter((s) => !s.carriage)), spec = pick(pool.flatMap((v) => (v.dirt ? [v, v] : [v]))); // dirt bikes twice as likely
     let themes = THEMES.filter((t) => !h.theme.slice(-2).includes(t)); if (!themes.length) themes = THEMES;
     return { k: lo + Math.floor(Math.random() * (hi - lo + 1)), vehicle: spec.id, theme: pick(themes), salt: 1 + Math.floor(Math.random() * 1e6), avoid: h.types[h.types.length - 1] || [], maxLen: 340 };
   }

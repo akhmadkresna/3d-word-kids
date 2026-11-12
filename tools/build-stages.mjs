@@ -11,7 +11,7 @@ const COUNT = Number(process.argv[2] || 100);
 let s = 12345; const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
 const order = [];
 while (order.length < COUNT) {
-  const pool = specs.filter((v) => !(order.length === 0 && v.id !== 'car-kit/sedan') && (order.length > 0 || true)).map((v) => v.id);
+  const pool = specs.filter((v) => !(order.length === 0 && v.id !== 'car-kit/sedan')).flatMap((v) => (v.dirt ? [v.id, v.id] : [v.id])); // dirt bikes appear twice as often
   const shuffled = pool.sort(() => rnd() - 0.5);
   if (order.length === 0) order.push('car-kit/sedan', ...shuffled.filter((x) => x !== 'car-kit/sedan')); else order.push(...shuffled);
 }

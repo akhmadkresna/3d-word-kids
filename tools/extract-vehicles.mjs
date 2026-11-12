@@ -71,6 +71,17 @@ for (const [pack, files] of Object.entries(LIST)) for (const file of files) {
   };
   out.push(spec);
 }
+// DIRT BIKES: the one motorcycle model, repainted (accent colour only), with bigger wheels, a rider and its own physics class
+const moto = out.find((v) => v.id === 'starter-kit/vehicle-motorcycle');
+const DIRT = [
+  { key: 'orange', name: 'Orange', paint: { h: 22, s: 0.9, v: 0.98 }, rider: { suit: 0xffffff, helmet: 0xff6d00 } },
+  { key: 'green', name: 'Green', paint: { h: 105, s: 0.8, v: 0.8 }, rider: { suit: 0x212121, helmet: 0x76ff03 } },
+  { key: 'blue', name: 'Blue', paint: { h: 210, s: 0.85, v: 0.92 }, rider: { suit: 0xffd600, helmet: 0x2979ff } },
+  { key: 'red', name: 'Red', paint: { h: 0, s: 0.85, v: 0.92 }, rider: { suit: 0x212121, helmet: 0xff1744 } },
+  { key: 'yellow', name: 'Yellow', paint: { h: 50, s: 0.9, v: 1.0 }, rider: { suit: 0x1565c0, helmet: 0xffea00 } },
+  { key: 'pink', name: 'Pink', paint: { h: 325, s: 0.6, v: 0.95 }, rider: { suit: 0xffffff, helmet: 0xff4081 } },
+];
+if (moto) { moto.name = 'Cruiser Bike'; for (const d of DIRT) out.push({ ...moto, id: `${moto.id}#${d.key}`, model: moto.id, name: `Dirt Bike ${d.name}`, dirt: true, wheelScale: 1.35, paint: d.paint, rider: d.rider }); }
 fs.writeFileSync('src/game/vehicleSpecs.json', JSON.stringify(out, null, 1));
 console.log(`wrote ${out.length} vehicles`);
 for (const s of out) console.log(s.id.padEnd(38), `len ${s.length} h ${s.height} axles ${s.axles.map((a) => `${a.x}/r${a.r}`).join(' ')}`);

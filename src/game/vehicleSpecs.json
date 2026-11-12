@@ -901,7 +901,7 @@
  },
  {
   "id": "starter-kit/vehicle-motorcycle",
-  "name": "Motorcycle",
+  "name": "Cruiser Bike",
   "pack": "starter-kit",
   "facing": "+z",
   "length": 2.435,
@@ -1547,5 +1547,227 @@
     "z": 0.593
    }
   ]
+ },
+ {
+  "id": "starter-kit/vehicle-motorcycle#orange",
+  "name": "Dirt Bike Orange",
+  "pack": "starter-kit",
+  "facing": "+z",
+  "length": 2.435,
+  "height": 1.266,
+  "width": 1.09,
+  "bottom": 0,
+  "top": 1.266,
+  "axles": [
+   {
+    "x": -0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": -0.657
+   },
+   {
+    "x": 0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": 0.857
+   }
+  ],
+  "model": "starter-kit/vehicle-motorcycle",
+  "dirt": true,
+  "wheelScale": 1.35,
+  "paint": {
+   "h": 22,
+   "s": 0.9,
+   "v": 0.98
+  },
+  "rider": {
+   "suit": 16777215,
+   "helmet": 16739584
+  }
+ },
+ {
+  "id": "starter-kit/vehicle-motorcycle#green",
+  "name": "Dirt Bike Green",
+  "pack": "starter-kit",
+  "facing": "+z",
+  "length": 2.435,
+  "height": 1.266,
+  "width": 1.09,
+  "bottom": 0,
+  "top": 1.266,
+  "axles": [
+   {
+    "x": -0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": -0.657
+   },
+   {
+    "x": 0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": 0.857
+   }
+  ],
+  "model": "starter-kit/vehicle-motorcycle",
+  "dirt": true,
+  "wheelScale": 1.35,
+  "paint": {
+   "h": 105,
+   "s": 0.8,
+   "v": 0.8
+  },
+  "rider": {
+   "suit": 2171169,
+   "helmet": 7798531
+  }
+ },
+ {
+  "id": "starter-kit/vehicle-motorcycle#blue",
+  "name": "Dirt Bike Blue",
+  "pack": "starter-kit",
+  "facing": "+z",
+  "length": 2.435,
+  "height": 1.266,
+  "width": 1.09,
+  "bottom": 0,
+  "top": 1.266,
+  "axles": [
+   {
+    "x": -0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": -0.657
+   },
+   {
+    "x": 0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": 0.857
+   }
+  ],
+  "model": "starter-kit/vehicle-motorcycle",
+  "dirt": true,
+  "wheelScale": 1.35,
+  "paint": {
+   "h": 210,
+   "s": 0.85,
+   "v": 0.92
+  },
+  "rider": {
+   "suit": 16766464,
+   "helmet": 2718207
+  }
+ },
+ {
+  "id": "starter-kit/vehicle-motorcycle#red",
+  "name": "Dirt Bike Red",
+  "pack": "starter-kit",
+  "facing": "+z",
+  "length": 2.435,
+  "height": 1.266,
+  "width": 1.09,
+  "bottom": 0,
+  "top": 1.266,
+  "axles": [
+   {
+    "x": -0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": -0.657
+   },
+   {
+    "x": 0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": 0.857
+   }
+  ],
+  "model": "starter-kit/vehicle-motorcycle",
+  "dirt": true,
+  "wheelScale": 1.35,
+  "paint": {
+   "h": 0,
+   "s": 0.85,
+   "v": 0.92
+  },
+  "rider": {
+   "suit": 2171169,
+   "helmet": 16717636
+  }
+ },
+ {
+  "id": "starter-kit/vehicle-motorcycle#yellow",
+  "name": "Dirt Bike Yellow",
+  "pack": "starter-kit",
+  "facing": "+z",
+  "length": 2.435,
+  "height": 1.266,
+  "width": 1.09,
+  "bottom": 0,
+  "top": 1.266,
+  "axles": [
+   {
+    "x": -0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": -0.657
+   },
+   {
+    "x": 0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": 0.857
+   }
+  ],
+  "model": "starter-kit/vehicle-motorcycle",
+  "dirt": true,
+  "wheelScale": 1.35,
+  "paint": {
+   "h": 50,
+   "s": 0.9,
+   "v": 1
+  },
+  "rider": {
+   "suit": 1402304,
+   "helmet": 16771584
+  }
+ },
+ {
+  "id": "starter-kit/vehicle-motorcycle#pink",
+  "name": "Dirt Bike Pink",
+  "pack": "starter-kit",
+  "facing": "+z",
+  "length": 2.435,
+  "height": 1.266,
+  "width": 1.09,
+  "bottom": 0,
+  "top": 1.266,
+  "axles": [
+   {
+    "x": -0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": -0.657
+   },
+   {
+    "x": 0.757,
+    "y": 0.3,
+    "r": 0.3,
+    "z": 0.857
+   }
+  ],
+  "model": "starter-kit/vehicle-motorcycle",
+  "dirt": true,
+  "wheelScale": 1.35,
+  "paint": {
+   "h": 325,
+   "s": 0.6,
+   "v": 0.95
+  },
+  "rider": {
+   "suit": 16777215,
+   "helmet": 16728193
+  }
  }
 ]

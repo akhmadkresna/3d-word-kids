@@ -5,6 +5,7 @@ const SPEED = 1.2;      // everything is 20 % faster than before: action starts 
 
 export function classify(spec) {
   const id = spec.id;
+  if (spec.dirt) return { cls: 'dirt', len: 3.4, top: 25 * SPEED, torque: 0.95, density: 0.75, freq: 3.0, damp: 0.42, grip: 1.55, level: 1.45, spin: 1.35 }; // dirt bike: light, fast, long-travel suspension, great air control
   let c = { cls: 'car', len: 4.2, top: 19, torque: 1.0, density: 1.0, freq: 3.8, damp: 0.5, grip: 1.4, level: 1 };
   if (/kart/.test(id)) c = { ...c, cls: 'kart', len: 2.8, top: 17, torque: 0.9, density: 0.9 };
   else if (/motorcycle/.test(id)) c = { ...c, cls: 'moto', len: 3.2, top: 20, torque: 0.8, density: 0.8, level: 1.3 };
@@ -20,8 +21,8 @@ export function classify(spec) {
 // Everything the physics needs for one vehicle, in metres.
 export function vehiclePhysics(spec, scaleOverride) { // scaleOverride: wagons use the locomotive's scale so they match in size
   const c = classify(spec), s = scaleOverride || c.len / spec.length, cy = (spec.bottom + spec.top) / 2;
-  const rear = spec.axles[0], front = spec.axles[spec.axles.length - 1];
-  const axles = [rear, front].map((a) => ({ x: a.x * s, y: (a.y - cy) * s, r: a.r * s }));
+  const rear = spec.axles[0], front = spec.axles[spec.axles.length - 1], ws = spec.wheelScale || 1; // dirt bikes: bigger wheels, centres lowered so the bike sits higher
+  const axles = [rear, front].map((a) => ({ x: a.x * s, y: (a.y - (ws - 1) * a.r - cy) * s, r: a.r * ws * s }));
   const bottomY = Math.min(axles[0].y, axles[1].y) + 0.35 * Math.min(axles[0].r, axles[1].r);
   const topY = (spec.top - cy) * s;
   return { ...c, scale: s, axles, chassis: { hx: spec.length * s * 0.46, y0: bottomY, y1: topY }, cy };

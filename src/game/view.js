@@ -42,6 +42,37 @@ function arrowTexture(color) {
 }
 const std = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, ...o });
 
+// ---- dirt bikes: repaint only the accent colour (the green swatch) of the shared palette texture, keep metal and tyres ----
+const paintCache = new Map();
+function repaintPalette(tex, paint) {
+  const key = `${paint.h}/${paint.s}/${paint.v}`; if (paintCache.has(key)) return paintCache.get(key);
+  const img = tex.image, W = img.width || 512, H = img.height || 512, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, W, H); const d = g.getImageData(0, 0, W, H), a = d.data;
+  const hsv2 = (h, s, v) => { const f = (n) => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); }; return [f(5) * 255, f(3) * 255, f(1) * 255]; };
+  for (let i = 0; i < a.length; i += 4) {
+    const r = a[i] / 255, gg = a[i + 1] / 255, b = a[i + 2] / 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), v = mx, sat = mx ? (mx - mn) / mx : 0;
+    if (sat < 0.4) continue; const dl = mx - mn; let h = mx === r ? ((gg - b) / dl) % 6 : mx === gg ? (b - r) / dl + 2 : (r - gg) / dl + 4; h = (h * 60 + 360) % 360;
+    if (Math.abs(h - 154) > 22) continue; // only the bike's green accent
+    const [nr, ng, nb] = hsv2(paint.h, paint.s, Math.min(1, (v / 0.52) * paint.v)); a[i] = nr; a[i + 1] = ng; a[i + 2] = nb;
+  }
+  g.putImageData(d, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapNearestFilter; t.anisotropy = 8; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
+  paintCache.set(key, t); return t;
+}
+// a little rider built from simple shapes, in the bike model's own units (z forward, y up)
+function makeRider(rider) {
+  const M = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 }), g = new THREE.Group();
+  const mesh = (geo, c, x, y, z) => { const m = new THREE.Mesh(geo, M(c)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+  const limb = (a, b, r, c) => { const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b), len = va.distanceTo(vb), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), M(c)); m.position.copy(va).add(vb).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.clone().sub(va).normalize()); m.castShadow = true; g.add(m); };
+  const dark = 0x222222, torso = mesh(new THREE.BoxGeometry(0.36, 0.5, 0.26), rider.suit, 0, 1.28, -0.05); torso.rotation.x = 0.55;
+  mesh(new THREE.SphereGeometry(0.17, 14, 10), rider.helmet, 0, 1.68, 0.14); mesh(new THREE.BoxGeometry(0.22, 0.09, 0.1), 0x111111, 0, 1.68, 0.3);
+  for (const sx of [-1, 1]) {
+    limb([sx * 0.22, 1.45, 0.05], [sx * 0.3, 1.14, 0.62], 0.055, rider.suit); mesh(new THREE.SphereGeometry(0.07, 8, 6), dark, sx * 0.3, 1.12, 0.64); // arm + glove on the handlebar
+    limb([sx * 0.14, 1.08, -0.2], [sx * 0.26, 0.92, 0.1], 0.07, rider.suit); limb([sx * 0.26, 0.92, 0.1], [sx * 0.2, 0.42, -0.02], 0.06, rider.suit); mesh(new THREE.BoxGeometry(0.1, 0.09, 0.24), dark, sx * 0.2, 0.38, 0.04); // leg + boot
+  }
+  return g;
+}
+
 export class GameView {
   constructor(container) {
     this.container = container;
@@ -383,7 +414,7 @@ export class GameView {
 
   async _vehicle(spec, vp) {
     const outer = new THREE.Group(), inner = new THREE.Group();
-    const model = await loadModel(spec.id, { scale: vp.scale });
+    const model = await loadModel(spec.model || spec.id, { scale: vp.scale });
     const dir = spec.facing === '-z' ? -1 : 1;
     const cz = spec.axles[0].z - spec.axles[0].x * dir;
     model.position.set(0, -vp.cy * vp.scale, -cz * vp.scale);
@@ -399,10 +430,15 @@ export class GameView {
       const axle = Math.abs(zLocal - rear) <= Math.abs(zLocal - front) ? 0 : 1;
       this.wheelNodes.push({ obj: o, axle, rest: o.position.clone() });
     }
+    if (spec.dirt) { // dirt bike: repaint, bigger knobby wheels
+      const pal = new Map(); model.traverse((o) => { if (o.isMesh && o.material && o.material.map) { const key = o.material.map; if (!pal.has(key)) pal.set(key, repaintPalette(key, spec.paint)); o.material = o.material.clone(); o.material.map = pal.get(key); } });
+      for (const wn of this.wheelNodes) { wn.obj.scale.multiplyScalar(spec.wheelScale); wn.rest.y -= (spec.wheelScale - 1) * spec.axles[0].r; }
+    }
     // damage visuals: private copies of the body materials (the cached model shares them), wheels spin then yaw
     const wheelParts = new Set(); for (const wn of this.wheelNodes) { wn.obj.rotation.order = 'YXZ'; wn.obj.traverse((o) => wheelParts.add(o)); }
     this.bodyMats = [];
     model.traverse((o) => { if (o.isMesh && !wheelParts.has(o) && o.material && o.material.color) { o.material = o.material.clone(); this.bodyMats.push({ m: o.material, base: o.material.color.clone() }); } });
+    if (spec.rider) model.add(makeRider(spec.rider));
     this.model = model; this.dmgApplied = -1; this.emitAcc = 0; this.fireAcc = 0;
     this.carOuter = outer; this.dirSign = dir;
   }

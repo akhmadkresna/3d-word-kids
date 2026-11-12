@@ -147,7 +147,7 @@ async function startDef(def) {
   for (let i = 0; i < 30; i++) sim.step(false); // let the suspension settle
   sim.events.length = 0; sim.time = 0; sim.damage = 0; view.resetCapture(sim);
   if (!recMode) { normalK = k; location.hash = String(k); try { localStorage.setItem(SAVE + '-last', String(k)); } catch {} }
-  $('stageNum').textContent = recMode ? `🎬 Mix · level ${k}` : `Stage ${k}`; $('vehName').textContent = spec.name; hintShown = false;
+  $('stageNum').textContent = recMode ? `🎬 Mix · level ${k}` : `Stage ${k}`; $('vehName').textContent = spec.name; hintShown = false; $('progCar').textContent = spec.dirt || /motorcycle/.test(spec.id) ? '🏍️' : /train/.test(spec.id) ? '🚂' : /(truck|firetruck|garbage|delivery|tractor|van|ambulance)/.test(spec.id) ? '🚚' : /(race|speedster|drag|racer|kart)/.test(spec.id) ? '🏎️' : '🚗';
   $('timeBest').textContent = !recMode && save.best[k] ? `Best ${fmt(save.best[k])}` : `Par ${fmt(def.par)}`;
   $('loading').style.display = 'none'; state = 'ready';
   setMsg(`${spec.name}<small>Hold <b>GAS</b> to go! · ${def.length} m<br>✈ In the air: <b>hold GAS = flip</b> · let go = land safely${recMode ? '' : '<br>☰ Stages (top right) = pick any stage'}</small>`);

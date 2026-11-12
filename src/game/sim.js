@@ -273,7 +273,7 @@ export class Sim {
     const stunt = grounded === 0 && this.airT > 0.3 && !this.wagons.length && !this.finished;
     if (stunt) {
       const w = this.chassis.getAngularVelocity();
-      if (wantGas) { if (w < 7.5) this.chassis.applyTorque(this.inertia * 26); }
+      if (wantGas) { if (w < 7.5 * (vp.spin || 1)) this.chassis.applyTorque(this.inertia * 26 * (vp.spin || 1)); }
       else if (Math.abs(ang) < 1.0) this.chassis.applyTorque(this.inertia * (-9 * ang - 3.5 * w));
       else this.chassis.applyTorque(this.inertia * (-2.8 * w));
     } else {
