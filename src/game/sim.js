@@ -6,13 +6,30 @@ const { World, Vec2, Box, Circle, Chain, Edge, WheelJoint, RevoluteJoint } = pla
 const FRICTION = { grass: 0.9, boost: 1.0, spring: 0.9, ice: 0.05, mud: 1.1 };
 export const DT = 1 / 60;
 
+// Ferry platform: docks at the near lip, travels across, docks at the far lip, returns (12 s cycle).
+export const FERRY_CYCLE = 12, FERRY_DOCK = 3.5;
+const smooth = (t) => t * t * (3 - 2 * t);
+export function ferryU(t) { // 0 = docked near side, 1 = docked far side
+  const u = ((t % FERRY_CYCLE) + FERRY_CYCLE) % FERRY_CYCLE;
+  if (u < FERRY_DOCK) return 0;
+  if (u < 6) return smooth((u - FERRY_DOCK) / (6 - FERRY_DOCK));
+  if (u < 9.5) return 1;
+  return 1 - smooth((u - 9.5) / (FERRY_CYCLE - 9.5));
+}
+export function ferryCenter(d, t) {
+  const left0 = d.x0 - 0.3, left1 = d.x1 + 0.3 - d.len;
+  return left0 + (left1 - left0) * ferryU(t) + d.len / 2;
+}
+/** seconds the ferry will stay docked on the near side (0 if it is away) */
+export function ferryDockRemaining(t) { const u = ((t % FERRY_CYCLE) + FERRY_CYCLE) % FERRY_CYCLE; return u < FERRY_DOCK ? FERRY_DOCK - u : 0; }
+
 export class Sim {
   constructor(stage, spec) {
     this.stage = stage; this.spec = spec; this.vp = vehiclePhysics(spec);
     this.world = new World({ gravity: new Vec2(0, -GRAVITY) });
     this.events = []; this.time = 0; this.resets = 0; this.finished = false; this.finishTime = null;
     this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.throttle = 0; this.cpIndex = 0; this.hint = false;
-    this.padState = new Map(); this.props = []; this.maxX = 0;
+    this.padState = new Map(); this.boostT = 0; this.props = []; this.maxX = 0;
     this._buildTerrain(); this._buildProps(); this._buildCar(); this.reset(true);
   }
 
@@ -31,7 +48,10 @@ export class Sim {
     const w = this.world;
     for (const p of this.stage.props) {
       let body;
-      if (p.type === 'seesaw') {
+      if (p.type === 'ferry') {
+        body = w.createBody({ type: 'kinematic', position: new Vec2(ferryCenter(p, 0), p.y - 0.25) });
+        body.createFixture(new Box(p.len / 2, 0.25), { friction: 1.3 });
+      } else if (p.type === 'seesaw') {
         const pivot = new Vec2(p.x, p.y + 0.55);
         body = w.createBody({ type: 'dynamic', position: pivot, angle: 0.12 });
         body.createFixture(new Box(p.len / 2, 0.16), { density: 1.2, friction: 0.9 });
@@ -113,12 +133,13 @@ export class Sim {
 
     // throttle ramps up/down so the vehicle does not jerk
     const wantGas = gas && !this.finished;
+    this.boostT = Math.max(0, this.boostT - dt);
     this.throttle = Math.max(0, Math.min(1, this.throttle + (wantGas ? 3 : -5) * dt));
     const grounded = this.grounded();
     for (const wh of this.wheels) {
-      const target = this.throttle * (vp.top / wh.r);
+      const target = this.throttle * (vp.top / wh.r) * (this.boostT > 0 ? 1.45 : 1);
       wh.joint.setMotorSpeed(-target);
-      wh.joint.setMaxMotorTorque(this.finished ? this.torque * 1.2 : wantGas ? this.torque : this.torque * 0.14);
+      wh.joint.setMaxMotorTorque(this.finished ? this.torque * 1.2 : wantGas ? this.torque : this.torque * 0.22);
       if (this.finished) wh.joint.setMotorSpeed(0);
     }
 
@@ -134,12 +155,16 @@ export class Sim {
       const inPad = this.wheels.some((wh) => { const p = wh.body.getPosition(); return p.x >= pad.x0 && p.x <= pad.x1 && p.y < pad.y + 2.5; });
       const was = this.padState.get(pad) || false; this.padState.set(pad, inPad);
       if (!inPad) continue;
-      if (pad.type === 'boost' && wantGas) { this.chassis.applyForceToCenter(new Vec2(Math.cos(ang) * this.mass * 22, Math.sin(ang) * this.mass * 22)); if (!was) this.events.push({ type: 'boost', x: pos.x, y: pos.y }); }
+      if (pad.type === 'boost' && wantGas) { this.boostT = 1.1; this.chassis.applyForceToCenter(new Vec2(Math.cos(ang) * this.mass * 22, Math.sin(ang) * this.mass * 22)); if (!was) this.events.push({ type: 'boost', x: pos.x, y: pos.y }); }
       else if (pad.type === 'boost' && !was) this.events.push({ type: 'boost', x: pos.x, y: pos.y });
       if (pad.type === 'spring' && !was) { for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.05, Math.max(b.getLinearVelocity().y, 0) + 17)); this.events.push({ type: 'spring', x: pos.x, y: pos.y }); }
       if (pad.type === 'mud') for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) { const v = b.getLinearVelocity(); b.setLinearVelocity(new Vec2(v.x * 0.985, v.y)); }
     }
 
+    for (const pr of this.props) if (pr.def.type === 'ferry') { // kinematic platform follows the ferry timetable
+      const tx = ferryCenter(pr.def, this.time), cx = pr.body.getPosition().x;
+      pr.body.setLinearVelocity(new Vec2((tx - cx) / dt, 0));
+    }
     this.world.step(dt, 8, 3);
 
     // events + state

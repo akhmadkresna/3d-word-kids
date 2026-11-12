@@ -18,6 +18,16 @@ export function buildStage(def) {
   const groundAt = () => y;
   const checkpoint = () => { if (x - lastCp > 85) { S.checkpoints.push({ x, y }); lastCp = x; } };
 
+  // a pit (water gap) between the current point and x+w; returns the lip/landing coordinates
+  const pit = (w, landDy) => {
+    piece('grass');
+    const lipX = x, lipY = y, landX = x + w, landY = y + landDy;
+    S.walls.push([[lipX, lipY], [lipX, lipY - 7]], [[landX, landY - 7], [landX, landY]]);
+    S.pits.push({ x0: lipX, x1: landX, y: Math.min(lipY, landY) - 3 });
+    x = landX; y = landY; cur = { surface: 'grass', pts: [[x, y]] };
+    return { lipX, lipY, landX, landY };
+  };
+
   const SEG = {
     flat: (s) => flat(s.len, s.surf),
     slope: (s) => { profile(s.len, (t) => s.dy * sm(t)); flat(3); },
@@ -26,13 +36,19 @@ export function buildStage(def) {
     logs: (s) => { for (let i = 0; i < s.n; i++) { flat(s.gap ?? 6); S.blocks.push({ x: x + 0.35, y: y + s.h / 2, w: 0.7, h: s.h }); flat(1.2); } flat(3); },
     steps: (s) => { for (let i = 0; i < s.n; i++) { push(x, y + s.h); flat(s.run); } flat(2); },
     jump: (s) => { // runup, kicker ramp, pit, landing
-      flat(s.runup); profile(s.rampLen, (t) => s.rise * t);
-      const lipX = x, lipY = y, landX = x + s.w, landY = y + s.landDy;
-      piece('grass');
-      S.walls.push([[lipX, lipY], [lipX, lipY - 7]], [[landX, landY - 7], [landX, landY]]);
-      S.pits.push({ x0: lipX, x1: landX, y: Math.min(lipY, landY) - 3 });
-      x = landX; y = landY; cur = { surface: 'grass', pts: [[x, y]] };
-      flat(10);
+      flat(s.runup); profile(s.rampLen, (t) => s.rise * t); pit(s.w, s.landDy); flat(10);
+    },
+    boostjump: (s) => { // boost pad -> ramp -> very wide gap
+      flat(s.runup); S.pads.push({ type: 'boost', x0: x, x1: x + s.boostLen, y }); flat(s.boostLen, 'boost'); flat(3);
+      profile(s.rampLen, (t) => s.rise * t); pit(s.w, s.landDy); flat(10);
+    },
+    ferry: (s) => { // gap crossed on a moving platform: wait for it to dock, then drive on
+      flat(s.runup); const r = pit(s.w, 0);
+      S.props.push({ type: 'ferry', x0: r.lipX, x1: r.landX, y: r.lipY, len: s.len });
+      flat(14);
+    },
+    drop: (s) => { // sudden cliff down, then climb back up
+      flat(s.len); push(x, y - s.h); flat(6); profile(s.h * 4.5, (t) => s.h * 0.9 * sm(t)); flat(4);
     },
     crates: (s) => {
       flat(2);

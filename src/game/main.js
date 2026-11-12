@@ -10,7 +10,7 @@ const $ = (id) => document.getElementById(id);
 const specById = Object.fromEntries(SPECS.map((s) => [s.id, s]));
 const SAVE = 'vroom-stages-v2'; // bumped when stage content changed
 const save = (() => { try { return JSON.parse(localStorage.getItem(SAVE)) || {}; } catch { return {}; } })();
-save.stars ||= {}; save.best ||= {};
+save.stars ||= {}; save.best ||= {}; save.order ||= 'seq';
 const persist = () => { try { localStorage.setItem(SAVE, JSON.stringify(save)); } catch {} };
 
 const view = new GameView($('game')), audio = new GameAudio();
@@ -71,6 +71,11 @@ function toggleMenu(force) {
 $('menuBtn').onclick = () => { audio.start(); toggleMenu(); };
 $('menuClose').onclick = () => toggleMenu(false);
 $('restartBtn').onclick = () => { toggleMenu(false); startStage(k); };
+$('randomBtn').onclick = () => { toggleMenu(false); randomStage(); };
+$('randBtn').onclick = () => { audio.start(); randomStage(); };
+const showOrder = () => { $('orderBtn').textContent = save.order === 'random' ? '🔀 After a stage: random' : '➡ After a stage: in order'; };
+$('orderBtn').onclick = () => { save.order = save.order === 'random' ? 'seq' : 'random'; persist(); showOrder(); };
+showOrder();
 $('muteBtn').onclick = () => { audio.start(); audio.setMuted(!audio.muted); $('muteBtn').textContent = audio.muted ? '🔇' : '🔊'; };
 $('musicBtn').onclick = () => { audio.start(); audio.setMusic(!audio.musicOn); $('musicBtn').textContent = `🎵 Music: ${audio.musicOn ? 'on' : 'off'}`; };
 $('resetProgress').onclick = () => { if (confirm('Clear all stars and best times?')) { save.stars = {}; save.best = {}; persist(); buildMenu(); } };
@@ -92,7 +97,8 @@ async function startStage(n) {
   setMsg(`${spec.name}<small>Hold <b>GAS</b> to go! · ${def.length} m<br>☰ Stages (top right) = pick any stage</small>`);
   view.cam.x = stage.start.x + 4;
 }
-function nextStage() { startStage(k >= STAGES.length ? 1 : k + 1); }
+function randomStage() { let n; do { n = 1 + Math.floor(Math.random() * STAGES.length); } while (n === k && STAGES.length > 1); startStage(n); }
+function nextStage() { if (save.order === 'random') randomStage(); else startStage(k >= STAGES.length ? 1 : k + 1); }
 
 function onFinish(e) {
   state = 'finished'; finishAt = now; const def = STAGES[k - 1], t = e.time, st = starsFor(t, def.par);
@@ -101,7 +107,7 @@ function onFinish(e) {
   countdown = 7; renderFinish(t, st);
 }
 function renderFinish(t, st) {
-  const last = k >= STAGES.length;
+  const last = k >= STAGES.length && save.order !== 'random';
   setMsg(`${last ? '🏆 ALL 100 STAGES! 🏆' : 'STAGE COMPLETE!'}<span class="stars">${starStr(st)}</span>${fmt(t)}<small>${last ? 'Press GAS to start again' : `Press GAS for next stage · auto in ${Math.ceil(countdown)}`} · RESET to replay</small>`);
 }
 

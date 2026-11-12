@@ -149,6 +149,12 @@ export class GameView {
       else if (p.type === 'barrel') { mesh = new THREE.Group(); const body = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r, 2.4, 18), std(0xf57c00)); body.rotation.x = Math.PI / 2; const band = new THREE.Mesh(new THREE.CylinderGeometry(p.r + 0.02, p.r + 0.02, 0.35, 18), std(0xffffff)); band.rotation.x = Math.PI / 2; mesh.add(body, band); }
       else if (p.type === 'pin') { mesh = new THREE.Group(); mesh.add(new THREE.Mesh(new THREE.CylinderGeometry(p.w * 0.45, p.w * 0.55, p.h, 14), std(0xffffff))); const st = new THREE.Mesh(new THREE.CylinderGeometry(p.w * 0.47, p.w * 0.5, 0.25, 14), std(0xe53935)); st.position.y = p.h * 0.18; mesh.add(st); }
       else if (p.type === 'ball') mesh = new THREE.Mesh(new THREE.SphereGeometry(p.r, 18, 14), std(palette[p.ci % 6], { roughness: 0.4 }));
+      else if (p.type === 'ferry') {
+        const c = document.createElement('canvas'); c.width = 128; c.height = 32; const g = c.getContext('2d'); g.fillStyle = '#ffd400'; g.fillRect(0, 0, 128, 32); g.fillStyle = '#222';
+        for (let i = -2; i < 8; i++) { g.beginPath(); g.moveTo(i * 20, 32); g.lineTo(i * 20 + 12, 32); g.lineTo(i * 20 + 32, 0); g.lineTo(i * 20 + 20, 0); g.fill(); }
+        const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = THREE.RepeatWrapping; tex.repeat.set(p.len / 3, 1);
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(p.len, 0.5, DEPTH * 0.92), [std(0x5a606b), std(0x5a606b), std(0x6f7683), std(0x3a3f47), new THREE.MeshStandardMaterial({ map: tex }), new THREE.MeshStandardMaterial({ map: tex })]);
+      }
       else if (p.type === 'seesaw') {
         mesh = new THREE.Mesh(new THREE.BoxGeometry(p.len, 0.32, DEPTH * 0.6), std(0xb07a3e));
         const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.75, 0.9, 3), std(0x7a7a7a)); base.rotation.z = Math.PI; base.position.set(p.x, p.y + 0.35, 0); base.castShadow = true; G.add(base);

@@ -3,7 +3,7 @@ import { mulberry32 } from './terrain.js';
 import { vehiclePhysics, GRAVITY } from './vehicleClass.js';
 
 export const THEMES = ['meadow', 'desert', 'snow', 'sunset', 'candy', 'night'];
-const UNLOCK = { hills: 1, bumps: 1, jump: 1, boost: 2, slope: 4, crates: 6, barrels: 8, pins: 14, balls: 16, logs: 18, ice: 20, seesaw: 24, spring: 28, steps: 30, mud: 34 };
+const UNLOCK = { hills: 1, bumps: 1, jump: 1, boost: 2, slope: 4, crates: 6, drop: 8, barrels: 8, boostjump: 12, pins: 14, balls: 16, logs: 18, ice: 20, ferry: 20, seesaw: 24, spring: 28, steps: 30, mud: 34 };
 const lerp = (a, b, t) => a + (b - a) * t;
 
 export function segLength(s) {
@@ -14,6 +14,9 @@ export function segLength(s) {
     case 'logs': return s.n * 7.2 + 3;
     case 'steps': return s.n * s.run + 2;
     case 'jump': return s.runup + s.rampLen + s.w + 10;
+    case 'boostjump': return s.runup + s.boostLen + 3 + s.rampLen + s.w + 10;
+    case 'ferry': return s.runup + s.w + 14;
+    case 'drop': return s.len + s.h * 4.5 + 10;
     case 'crates': return s.cols * s.size + 6;
     case 'barrels': return 8; case 'pins': return s.n * 1.3 + 6; case 'balls': return 12;
     case 'seesaw': return s.len + 6; case 'boost': return s.len + 4; case 'spring': return 12;
@@ -36,6 +39,9 @@ export function generateStage(k, spec, attempt = 0) {
   if (theme === 'desert' && weights.mud) weights.mud = 2;
   if (k < 10) { weights.hills = 2; weights.bumps = 1; }
   weights.jump = k < 10 ? 5 : 4; // jumps over gaps are the signature obstacle
+  if (weights.boostjump) weights.boostjump = 2;
+  if (weights.ferry) weights.ferry = 1.5;
+  if (weights.drop) weights.drop = 2;
   const pick = () => { const tot = Object.values(weights).reduce((a, b) => a + b, 0); let x = rnd() * tot; for (const [t, w] of Object.entries(weights)) { if ((x -= w) <= 0) return t; } return 'hills'; };
 
   const g = {
@@ -54,6 +60,13 @@ export function generateStage(k, spec, attempt = 0) {
       const w = Math.max(3.5, range * lerp(0.2, 0.78, d) * (0.85 + rnd() * 0.3));
       return { t: 'jump', runup: short ? 16 : +lerp(26, 36, rnd()).toFixed(1), rampLen: +rampLen.toFixed(1), rise, w: +w.toFixed(1), landDy: +(-rise * lerp(0.55, 0.85, rnd())).toFixed(2) };
     },
+    boostjump() {
+      const v = vp.top * 1.45 * 0.85, rampLen = lerp(7, 9, rnd()), rise = +lerp(2, 2.8, rnd()).toFixed(2);
+      const ang = Math.atan2(rise, rampLen), range = (v * v * Math.sin(2 * ang)) / GRAVITY;
+      return { t: 'boostjump', runup: 12, boostLen: 10, rampLen: +rampLen.toFixed(1), rise, w: +Math.max(8, range * lerp(0.3, 0.7, d)).toFixed(1), landDy: +(-rise * lerp(0.55, 0.85, rnd())).toFixed(2) };
+    },
+    ferry() { return { t: 'ferry', runup: 24, w: +lerp(14, 18, rnd()).toFixed(1), len: 10 }; },
+    drop() { return { t: 'drop', len: +lerp(8, 14, rnd()).toFixed(1), h: +(lerp(2.5, 7, d) * (0.8 + rnd() * 0.4)).toFixed(1) }; },
     seesaw() { return { t: 'seesaw', len: 9 }; },
     boost() { return { t: 'boost', len: +lerp(8, 14, rnd()).toFixed(1) }; },
     spring() { return { t: 'spring' }; },

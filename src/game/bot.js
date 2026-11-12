@@ -1,12 +1,26 @@
 // Headless players used to check every stage can be finished with the single gas button.
-import { Sim, DT } from './sim.js';
+import { Sim, DT, ferryDockRemaining, ferryU } from './sim.js';
 import { buildStage } from './terrain.js';
 
 // policies: decide gas (true/false) each step
 export const POLICIES = {
   hold: () => true,
   // lift off the gas when the nose is too high (wheelie) or while airborne
-  smart: (sim) => !(sim.angle > 0.7 || (sim.grounded() === 0 && sim.angle < -0.5)),
+  smart: (sim) => {
+    if (sim.angle > 0.7 || (sim.grounded() === 0 && sim.angle < -0.5)) return false;
+    // ferry: approach slowly, board while it is docked, release the gas to ride across, drive off at the far dock
+    for (const p of sim.props) {
+      if (p.def.type !== 'ferry') continue;
+      const d = p.def, dist = d.x0 - sim.x;
+      if (sim.x > d.x1 + 0.3) continue;
+      if (dist > 40) return true;
+      if (sim.x >= d.x0 - 0.3) return ferryU(sim.time) > 0.97;           // on the ferry: ride until it docks on the far side
+      const docked = ferryDockRemaining(sim.time);
+      if (docked > 1.4) return sim.speed < 5;                             // docked: roll on slowly
+      return dist > 12 ? sim.speed < 5 : false;                           // away: wait (brake) before the edge
+    }
+    return true;
+  },
   // tap pattern: 1.2 s on, 0.25 s off (helps on ice / steep climbs)
   pulse: (sim) => (sim.time % 1.45) < 1.2,
 };
