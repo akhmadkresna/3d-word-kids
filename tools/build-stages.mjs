@@ -22,12 +22,12 @@ for (let k = 1; k <= COUNT; k++) {
   let chosen = null;
   for (let attempt = 0; attempt < 9 && !chosen; attempt++) {
     const def = generateStage(k, spec, attempt);
-    for (const policy of ['hold', 'smart']) {
+    for (const policy of ['air', 'smart']) {
       const res = runBot(def, spec, policy, 160, 2);
-      if (res.ok && (policy === 'hold' ? res.resets <= 2 : res.resets <= 1)) { chosen = { def, res, policy }; break; }
+      if (res.ok && (policy === 'air' ? res.resets <= 2 : res.resets <= 1)) { chosen = { def, res, policy }; break; }
     }
   }
-  if (!chosen) { failed++; const def = generateStage(k, spec, 8); chosen = { def, res: runBot(def, spec, 'hold', 160, 3), policy: 'none' }; console.log(`!! stage ${k} (${spec.id}) not solved by bots`); }
+  if (!chosen) { failed++; const def = generateStage(k, spec, 8); chosen = { def, res: runBot(def, spec, 'smart', 160, 3), policy: 'none' }; console.log(`!! stage ${k} (${spec.id}) not solved by bots`); }
   if (chosen.def.attempt > 0) relaxed++;
   const t = chosen.res.ok ? chosen.res.time : 90;
   stages.push({ ...chosen.def, length: Math.round(chosen.res.stage.finishX), par: +(t * 1.3).toFixed(1), botTime: +t.toFixed(1), solvedBy: chosen.policy, botResets: chosen.res.resets ?? 0 });
@@ -35,4 +35,4 @@ for (let k = 1; k <= COUNT; k++) {
 }
 fs.writeFileSync('src/game/stages.json', JSON.stringify(stages));
 const lens = stages.map((x) => x.length), solved = stages.filter((x) => x.solvedBy !== 'none').length;
-console.log(`wrote ${stages.length} stages. solved by bot: ${solved}. relaxed difficulty: ${relaxed}. length ${Math.min(...lens)}-${Math.max(...lens)} m. policies: hold ${stages.filter((x) => x.solvedBy === 'hold').length}, smart ${stages.filter((x) => x.solvedBy === 'smart').length}`);
+console.log(`wrote ${stages.length} stages. solved by bot: ${solved}. relaxed difficulty: ${relaxed}. length ${Math.min(...lens)}-${Math.max(...lens)} m. policies: air ${stages.filter((x) => x.solvedBy === 'air').length}, smart ${stages.filter((x) => x.solvedBy === 'smart').length}`);

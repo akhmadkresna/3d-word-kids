@@ -18,7 +18,7 @@ const STEP = 0.8;
 
 export function buildStage(def) {
   const rng = mulberry32(def.seed || 1);
-  const S = { def, pieces: [], walls: [], props: [], pads: [], pits: [], blocks: [], checkpoints: [], loops: [], tunnels: [], rumbles: [] };
+  const S = { def, pieces: [], walls: [], props: [], pads: [], pits: [], blocks: [], checkpoints: [], loops: [], tunnels: [], rumbles: [], superLips: [] };
   let x = 0, y = 0, cur = { surface: 'grass', pts: [[0, 0]] }, lastCp = -999;
   // collectibles: stars + balloons. Line/balloon requests are resolved once the ground height is known.
   S.collectibles = []; const lineReqs = [], balloonReqs = [], crng = mulberry32((def.seed || 1) + 4242);
@@ -167,6 +167,13 @@ export function buildStage(def) {
     const x0 = x; SEG[seg.t](seg); checkpoint();
     if (seg.t !== 'flat') { starLine(x0 + 3, x - 3); if (crng() < 0.7 && seg.t !== 'ferry') balloons(x0 + 4, x - 4, 3 + Math.floor(crng() * 3)); }
     else if (seg.len > 14) starLine(x0 + 2, x - 2, 1.6, 7);
+  }
+  if (def.finale) { // SUPER RAMP FINALE: boost pad -> huge psychedelic ramp -> a long flight -> a big landing zone; the finish line is after the landing
+    const f = def.finale; flat(f.runup - 16); S.pads.push({ type: 'boost', x0: x, x1: x + 14, y }); flat(14, 'boost'); flat(4);
+    const bx = x; piece('funk'); profile(f.rampLen, (t) => f.rise * t); const lx = x, ly = y; piece('grass'); push(x, y - f.rise);
+    S.superLips.push({ x: lx, y: ly, x0: bx, rise: f.rise });
+    starArc(lx, ly, lx + f.land * 0.7, ly - f.rise, 11 + f.rise, 12);
+    profile(f.land * 0.62, (t) => -f.rise * 1.5 * sm(t)); flat(f.land * 0.38); // a downhill landing slope: the car comes down parallel to it, so the big landing is not a smash
   }
   flat(8); const finishX = x; flat(22); piece('grass');
   S.pieces.push(cur);

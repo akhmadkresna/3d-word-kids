@@ -10,9 +10,9 @@ self.onmessage = (e) => {
     let chosen = null;
     for (let attempt = 0; attempt < 9 && !chosen; attempt++) {
       const def = generateStage(k, spec, attempt, { salt, theme, avoid, maxLen });
-      for (const policy of ['hold', 'smart']) {
+      for (const policy of ['air', 'smart']) {
         const res = runBot(def, spec, policy, 160, 2);
-        if (res.ok && res.resets <= (policy === 'hold' ? 2 : 1)) { chosen = { def, res, policy }; break; }
+        if (res.ok && res.resets <= (policy === 'air' ? 2 : 1)) { chosen = { def, res, policy }; break; }
       }
     }
     if (!chosen) { // extremely unlikely: fall back to the easiest version

@@ -9,7 +9,7 @@ import { Recorder } from './recorder.js';
 
 const $ = (id) => document.getElementById(id);
 const specById = Object.fromEntries(SPECS.map((s) => [s.id, s]));
-const SAVE = 'vroom-stages-v3'; // bumped when stage content changed
+const SAVE = 'vroom-stages-v4'; // bumped when stage content changed
 const save = (() => { try { return JSON.parse(localStorage.getItem(SAVE)) || {}; } catch { return {}; } })();
 save.stars ||= {}; save.best ||= {}; save.order ||= 'seq';
 const persist = () => { try { localStorage.setItem(SAVE, JSON.stringify(save)); } catch {} };
@@ -111,7 +111,7 @@ async function startDef(def) {
   $('stageNum').textContent = recMode ? `🎬 Mix · level ${k}` : `Stage ${k}`; $('vehName').textContent = spec.name; hintShown = false;
   $('timeBest').textContent = !recMode && save.best[k] ? `Best ${fmt(save.best[k])}` : `Par ${fmt(def.par)}`;
   $('loading').style.display = 'none'; state = 'ready';
-  setMsg(`${spec.name}<small>Hold <b>GAS</b> to go! · ${def.length} m${recMode ? '' : '<br>☰ Stages (top right) = pick any stage'}</small>`);
+  setMsg(`${spec.name}<small>Hold <b>GAS</b> to go! · ${def.length} m<br>✈ In the air: <b>hold GAS = flip</b> · let go = land safely${recMode ? '' : '<br>☰ Stages (top right) = pick any stage'}</small>`);
   view.cam.x = stage.start.x + 4 - (stage.trainExtra || 0) * 0.5;
 }
 const startStage = (n) => { recMode = false; document.body.classList.remove('rec'); return startDef(STAGES[Math.max(1, Math.min(STAGES.length, n)) - 1]); };
@@ -168,8 +168,9 @@ function frame(tms) {
         audio.play(e); view.event(e, now);
         if (e.type === 'bump' && e.power > 0.5) view.shakeCamera(0.25 * e.power);
         if (e.type === 'finish') onFinish(e);
-        if (e.type === 'trick') lastTrickDir = e.dir;
-        if (e.type === 'flip') pop(e.n > 1 ? '🌀🌀 DOUBLE FLIP!!' : lastTrickDir > 0 ? '🌀 BACKFLIP!' : '🌀 FRONT FLIP!');
+        if (e.type === 'flip') pop((e.n === 1 ? '🌀 BACKFLIP!' : e.n === 2 ? '🌀🌀 DOUBLE BACKFLIP!!' : e.n === 3 ? '🌀🌀🌀 TRIPLE FLIP!!!' : `🌀 MEGA FLIP x${e.n}!!!`) + (e.perfect ? ' ✨ PERFECT!' : ''));
+        if (e.type === 'crash') { pop('💥 CRASH LANDING!'); audio.play({ type: 'crash' }); }
+        if (e.type === 'super') pop('🚀 SUPER RAMP!!');
         if (e.type === 'air' && e.time > 2.0 && now - lastPop > 0.6) pop(`🚀 AIRTIME ${e.time.toFixed(1)}s!`);
       }
       sim.events.length = 0;

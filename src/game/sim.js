@@ -32,7 +32,7 @@ export class Sim {
     this.events = []; this.time = 0; this.resets = 0; this.finished = false; this.finishTime = null;
     this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.throttle = 0; this.cpIndex = 0; this.hint = false;
     this.collect = stage.collectibles.map((c) => ({ ...c, got: false })); this.starsGot = 0; this.starsTotal = this.collect.length;
-    this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.loop = null; this.rumble = 0; this.airT = 0; this.groundT = 0; this.trick = null; this.flips = 0; this.bestAir = 0; this.props = []; this.maxX = 0;
+    this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.loop = null; this.superDone = false; this.rumble = 0; this.airT = 0; this.airRot = 0; this.groundT = 0; this.trick = null; this.flips = 0; this.bestAir = 0; this.props = []; this.maxX = 0;
     this._buildTerrain(); this._buildProps(); this._buildCar(); this._buildWagons(); this.reset(true);
   }
 
@@ -158,7 +158,7 @@ export class Sim {
     }
     if (this.wagons.length) this._placeWagons();
     if (this.loop) { this._setDynamic(); this.loop = null; }
-    this.trick = null; this.airT = 0;
+    this.trick = null; this.airT = 0; this.airRot = 0;
     this.damage = 0; // a reset / respawn repairs the vehicle
     this.throttle = 0; this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.hint = false; this.dead = false;
     this.prevV = new Vec2(0, 0); this.maxX = p.x; this.grace = 0.5;
@@ -181,6 +181,7 @@ export class Sim {
     return 4.5;
   }
   trickAngle() {
+    return 0; // (flips are real physics now: hold GAS in the air to spin)
     const T = this.trick; if (!T) return 0;
     const sm = (k) => k * k * (3 - 2 * k);
     if (T.landed !== undefined) { const k = Math.min(1, (this.time - T.landed) / 0.15), base = T.angleAtLand, tgt = Math.round(base / (2 * Math.PI)) * 2 * Math.PI; if (k >= 1) { this.trick = null; return 0; } return (base + (tgt - base) * sm(k)) % (2 * Math.PI); }
@@ -188,26 +189,20 @@ export class Sim {
   }
   _updateAir(dt, grounded) {
     if (grounded > 0) this.groundT += dt; else this.groundT = 0;
-    const wasAir = this.airT;
-    if (grounded === 0) { this.airT += dt; } else if (this.airT > 0) {
-      // landing
+    if (grounded === 0) { this.airT += dt; this.airRot += this.chassis.getAngularVelocity() * dt; }
+    else if (this.airT > 0) {
+      // landing: how much did we spin, and how level are we compared with the ground?
       if (this.airT > this.bestAir) this.bestAir = this.airT;
-      if (this.trick && this.trick.landed === undefined) {
-        const T = this.trick, prog = (this.time - T.t0) / T.dur; T.angleAtLand = this.trickAngle(); T.landed = this.time;
-        if (prog >= 0.8) { this.flips += T.flips; this.events.push({ type: 'flip', n: T.flips, total: this.flips, x: this.x, y: this.y }); }
+      if (this.airT > 0.3 && !this.wagons.length) {
+        const rotTurns = this.airRot / (2 * Math.PI), n = Math.round(Math.abs(rotTurns)), g = this.stage.groundY;
+        const slope = Math.atan2((g(this.x + 1.5) ?? this.y) - (g(this.x - 1.5) ?? this.y), 3);
+        let rel = this.angle - slope; rel -= Math.round(rel / (2 * Math.PI)) * 2 * Math.PI;
+        if (n >= 1 && Math.abs(rel) < 1.0) { this.flips += n; this.events.push({ type: 'flip', n, total: this.flips, perfect: Math.abs(rel) < 0.3, x: this.x, y: this.y }); }
+        else if (Math.abs(this.airRot) > 1.6 && Math.abs(rel) > 1.1) { this.damage = Math.min(1, this.damage + 0.25); this.events.push({ type: 'crash', rel, x: this.x, y: this.y }); }
       }
       if (this.airT > 1.6) this.events.push({ type: 'air', time: this.airT, x: this.x, y: this.y });
-      this.airT = 0;
+      this.airT = 0; this.airRot = 0;
     }
-    // take-off: plan a flip if there is enough air time ahead
-    if (this.airT > 0.12 && wasAir <= 0.12 && !this.trick && this.groundT === 0 && !this.wagons.length) {
-      const tl = this._predictLanding();
-      if (tl && tl > 1.15) {
-        const flips = tl > 2.5 ? 2 : 1, dur = flips === 1 ? 0.85 : 1.5;
-        if (dur + 0.2 < tl) { this.trick = { t0: this.time, dur, flips, dir: Math.random() < 0.7 ? 1 : -1 }; this.events.push({ type: 'trick', flips, dir: this.trick.dir, x: this.x, y: this.y }); }
-      }
-    }
-    if (this.trick && this.trick.landed !== undefined && this.time - this.trick.landed > 0.2) this.trick = null;
   }
 
   _collect(pos) { // stars + balloons: grabbed by the vehicle body or either wheel (generous radius, kids are small!)
@@ -273,9 +268,19 @@ export class Sim {
       if (this.finished) wh.joint.setMotorSpeed(0);
     }
 
-    // stability assist: level the vehicle in the air, gently resist flips on the ground
-    const kk = grounded ? 3 + 14 * Math.min(1, Math.abs(ang) / 0.8) : 22 * vp.level, cc = grounded ? 2.2 : 5;
-    if (Math.abs(ang) < 2.4 || !grounded) this.chassis.applyTorque(this.inertia * (-kk * ang - cc * this.chassis.getAngularVelocity()) * (this.finished ? 1.5 : 1));
+    // AIR CONTROL: after 0.3 s of real air time, HOLD GAS = spin backwards (backflips!). Let go = the spin stops, and the car only levels itself
+    // if it is already close to level. Release too late / at the wrong angle = a bad landing. (Short bump-hops keep the old gentle self-levelling.)
+    const stunt = grounded === 0 && this.airT > 0.3 && !this.wagons.length && !this.finished;
+    if (stunt) {
+      const w = this.chassis.getAngularVelocity();
+      if (wantGas) { if (w < 7.5) this.chassis.applyTorque(this.inertia * 26); }
+      else if (Math.abs(ang) < 1.0) this.chassis.applyTorque(this.inertia * (-9 * ang - 3.5 * w));
+      else this.chassis.applyTorque(this.inertia * (-2.8 * w));
+    } else {
+      // stability assist: level the vehicle on short hops, gently resist flips on the ground
+      const kk = grounded ? 3 + 10 * Math.min(1, Math.abs(ang) / 0.8) : 22 * vp.level, cc = grounded ? 2.2 : 5;
+      if (Math.abs(ang) < 2.4 || !grounded) this.chassis.applyTorque(this.inertia * (-kk * ang - cc * this.chassis.getAngularVelocity()) * (this.finished ? 1.5 : 1));
+    }
 
     // downforce at speed keeps the wheels on crests (arcade feel)
     if (grounded && Math.abs(vel.x) > 8) this.chassis.applyForceToCenter(new Vec2(0, -this.mass * GRAVITY * 0.25 * Math.min(1, (Math.abs(vel.x) - 8) / 8)));
@@ -304,9 +309,9 @@ export class Sim {
 
     // events + state
     const v2 = this.chassis.getLinearVelocity(), dvx = v2.x - this.prevV.x, dvy = v2.y - this.prevV.y, dv = Math.hypot(dvx, dvy);
-    if (this.grace <= 0 && dv > 2.5 && this.time - this.lastHit > 0.15 && !(this.rumble > 0.25 && dv < 6)) { // (a rumble-strip rattle is not damage)
+    if (this.grace <= 0 && dv > 3.5 && this.time - this.lastHit > 0.15 && !(this.rumble > 0.25 && dv < 6)) { // (a rumble-strip rattle is not damage)
       // every knock adds damage in proportion to how hard it was: a soft landing ~3-6 %, a hard crash up to 35 % (cosmetic only)
-      const hit = Math.min(0.35, (dv - 2) / 45); this.damage = Math.min(1, this.damage + hit); this.lastHit = this.time;
+      const hit = Math.min(0.3, (dv - 3) / 150); this.damage = Math.min(1, this.damage + hit); this.lastHit = this.time;
       this.events.push({ type: 'bump', power: Math.min(1, dv / 22), hit, damage: this.damage, dvx, dvy, x: pos.x, y: pos.y });
     }
     if (!this.wagons.length) for (const l of this.stage.loops) { // (trains are too long for loops) fast enough at the foot of a ring -> ride the loop
@@ -316,6 +321,7 @@ export class Sim {
     this.maxX = Math.max(this.maxX, pos.x);
     const onRumble = this.stage.rumbles.some((r) => pos.x > r.x0 - 1 && pos.x < r.x1 + 1) && this.grounded() > 0;
     this.rumble += ((onRumble ? Math.min(1, Math.abs(v2.x) / 16) : 0) - this.rumble) * Math.min(1, dt * 8);
+    for (const l of this.stage.superLips) if (!this.superDone && pos.x > l.x && this.airT > 0) { this.superDone = true; this.events.push({ type: 'super', x: pos.x, y: pos.y }); }
     this._collect(pos);
     while (this.cpIndex + 1 < this.stage.checkpoints.length && pos.x > this.stage.checkpoints[this.cpIndex + 1].x) { this.cpIndex++; this.events.push({ type: 'checkpoint', x: pos.x, y: pos.y }); }
     if (!this.finished && pos.x >= this.stage.finishX) { this.finished = true; this.finishTime = this.time; this.events.push({ type: 'finish', time: this.time, x: pos.x, y: pos.y }); }
@@ -329,8 +335,8 @@ export class Sim {
     this.flipTimer = flipped ? this.flipTimer + dt : 0;
     const stalled = wantGas && Math.abs(v2.x) < 0.4 && grounded > 0;
     this.stuckTimer = stalled ? this.stuckTimer + dt : 0;
-    this.hint = this.flipTimer > 1.5 || this.stuckTimer > 3;
-    if (this.flipTimer > 6 || this.stuckTimer > 12) this.reset();
+    this.hint = this.flipTimer > 1.0 || this.stuckTimer > 3;
+    if (this.flipTimer > 3.2 || this.stuckTimer > 12) this.reset();
   }
 
   _die(waterY, pos) { this.dead = true; this.deadTimer = 1.1; this.events.push({ type: 'splash', x: pos.x, y: waterY }); }

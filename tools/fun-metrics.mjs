@@ -10,7 +10,7 @@ const specs = Object.fromEntries(JSON.parse(fs.readFileSync('src/game/vehicleSpe
 const every = Number(process.argv[2] || 4);
 const rows = [];
 for (const st of stages.filter((x) => (x.k - 1) % every === 0)) {
-  const sim = new Sim(buildStage(st), specs[st.vehicle]), pol = POLICIES[st.solvedBy === 'smart' ? 'smart' : 'hold'];
+  const sim = new Sim(buildStage(st), specs[st.vehicle]), pol = POLICIES[st.solvedBy === 'smart' ? 'smart' : 'air'];
   let air = 0, run = 0, big = 0, vsum = 0, n = 0, calm = 0, calmRun = 0, bestCalm = 0, maxAir = 0;
   for (let i = 0; i < 60 * 160 && !sim.finished; i++) {
     sim.step(pol(sim)); sim.events.length = 0;

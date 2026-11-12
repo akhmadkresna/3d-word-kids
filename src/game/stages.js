@@ -47,7 +47,7 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
   const boss = k % 10 === 0, ease = Math.max(0.3, 1 - attempt * 0.12);
   const d = Math.min(1, (k / 100 + (boss ? 0.08 : 0))) * ease;
   const theme = opts.theme || THEMES[(k - 1) % THEMES.length];
-  const target = Math.min(opts.maxLen || 1e9, lerp(170, 380, k / 100) * (boss ? 1.2 : 1) * lerp(0.85, 1.15, rnd()));
+  const target = Math.min(opts.maxLen || 1e9, lerp(120, 300, k / 100) * (boss ? 1.2 : 1) * lerp(0.85, 1.15, rnd()));
   const avail = Object.keys(UNLOCK).filter((t) => UNLOCK[t] <= k);
   const weights = Object.fromEntries(avail.map((t) => [t, 1]));
   if (theme === 'snow' && weights.ice) weights.ice = 3;
@@ -160,5 +160,7 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
   }
   // pull the stage back to roughly its starting height so it never drifts off screen
   if (Math.abs(drift) > 3) segs.push({ t: 'slope', len: Math.min(80, Math.abs(drift) * 4 + 12), dy: -drift });
-  return { k, vehicle: spec.id, theme, seed, attempt, boss, dropIn: true, ...(wagons.length ? { wagons } : {}), segs, expectedLength: Math.round(total) };
+  // the finale: a SUPER RAMP (boosted, 7-11 m tall) with a long flight and landing zone; trains get a lower one
+  const rise = +Math.min(isTrain ? 7 : 11, lerp(7, 11, d) * (0.9 + rnd() * 0.2)).toFixed(1), finale = { runup: 40, rise, rampLen: +(rise / 0.6).toFixed(1), land: opts.maxLen ? 95 : 105 };
+  return { k, vehicle: spec.id, theme, seed, attempt, boss, dropIn: true, finale, ...(wagons.length ? { wagons } : {}), segs, expectedLength: Math.round(total) };
 }

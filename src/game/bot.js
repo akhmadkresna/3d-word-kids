@@ -5,9 +5,11 @@ import { buildStage } from './terrain.js';
 // policies: decide gas (true/false) each step
 export const POLICIES = {
   hold: () => true,
+  // the "good player": gas on the ground, let go of it in the air (so the car does not spin and lands level)
+  air: (sim) => !(sim.airT > 0.3),
   // lift off the gas when the nose is too high (wheelie) or while airborne
   smart: (sim) => {
-    if (sim.angle > 0.7 || (sim.grounded() === 0 && sim.angle < -0.5)) return false;
+    if (sim.airT > 0.3 || sim.angle > 0.7 || (sim.grounded() === 0 && sim.angle < -0.5)) return false;
     // ferry: approach slowly, board while it is docked, release the gas to ride across, drive off at the far dock
     for (const p of sim.props) {
       if (p.def.type !== 'ferry') continue;
@@ -25,7 +27,7 @@ export const POLICIES = {
   pulse: (sim) => (sim.time % 1.45) < 1.2,
 };
 
-export function runBot(def, spec, policy = 'hold', maxTime = 150, maxResets = 3) {
+export function runBot(def, spec, policy = 'air', maxTime = 150, maxResets = 3) {
   const stage = buildStage(def), sim = new Sim(stage, spec), pol = POLICIES[policy];
   const steps = Math.ceil(maxTime / DT);
   for (let i = 0; i < steps; i++) {

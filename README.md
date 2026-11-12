@@ -16,9 +16,13 @@ Finish a stage → ★ rating by time (par is based on a test bot) → next stag
 Kids got bored fast on long calm tracks and loved **ramps that fling the car and lots of bumps**, so the game is built around that:
 - **Floaty, bouncy physics:** reduced gravity in the air (long hang time), soft bouncy suspension and wheels, vehicles 20 % faster, and every stage starts by rolling down a drop-in slope so the action begins immediately.
 - **Every stage = a RAMP TRAIN** (3-4 launch ramps back to back, each one throws you ~40 m) **+ a BUMP FIELD** (10-16 big psychedelic bouncy bumps) **+ one showpiece/bumpy obstacle**, with small bumps instead of flat road in between. Stages are ~20-30 s.
-- **Automatic mid-air flips:** on any big jump the car does a backflip / front flip / double flip (visual, always lands safely) with a 🌀 counter and a "BACKFLIP!" / "DOUBLE FLIP!!" / "AIRTIME 2.4s!" popup; the camera pulls back during big air.
+- **Manual stunts (hold GAS in the air = backflip):** after a short moment of real air time, *kick the gas and the car spins backwards; keep holding and it keeps spinning* (double, triple, mega flips). **Let go and the spin stops**; if you are close to level the car levels itself and lands safely, but let go too late / at a bad angle and you get a **💥 CRASH LANDING** (big damage, debris, maybe on your roof — press RESET). Land it level after a flip for 🌀 BACKFLIP! / DOUBLE / TRIPLE (✨ PERFECT for a very clean landing). Trains cannot flip (too long).
+- **🚀 SUPER RAMP finale:** every stage ends with a boosted, 7-11 m tall rainbow ramp, 3-5 s of air time to show off (stunts!), a long downhill landing zone, and then the finish line.
 - ⭐ stars and 🎈 balloons along the way, cheering animals, loops, rainbow bridges, tunnels, mushrooms.
-`npm run` / `node tools/fun-metrics.mjs` measures it: airtime went from 24 % to 52 %, big jumps (>0.8 s) from 4 to ~11 per minute, longest calm stretch from 2.6 s to 1.3 s.
+`node tools/fun-metrics.mjs` measures it: airtime went from 24 % to 52 %, big jumps (>0.8 s) from 4 to ~11 per minute, longest calm stretch from 2.6 s to 1.3 s.
+
+### Playing it "right"
+The stage checker (`npm run validate`) uses a **"good player" bot**: gas on the ground, let go of it in the air. Players who never let go of GAS will spin and crash a lot on big jumps (about 3 crash landings per stage in simulation) — that is the intended trade-off between "hold GAS = easy driving" and "stunts need timing".
 
 ## Trains pull wagons (gerbong)
 Every train (diesel, locomotive, electric, tram) pulls 2-4 coupled wagons (box, coal, tanker, container, flatbed, lumber…). Each wagon is its own physics body with its own wheels on a limited-angle hinge, so the train bends over bumps and flies over gaps as one. The start platform is lengthened to hold the whole train, trains skip loops/ferries/seesaws (too long), and the camera pulls back to frame the full train.

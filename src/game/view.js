@@ -273,6 +273,17 @@ export class GameView {
       const sign = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.6, 0.4), std(0x37474f)); sign.position.set(-l.R - 2.5, -l.R + 1.3, 3.2); grp.add(sign);
       G.add(grp);
     }
+    // super ramp banner: a big "SUPER RAMP!" sign standing at the foot of the finale ramp
+    for (const l of stage.superLips) {
+      const c = document.createElement('canvas'); c.width = 512; c.height = 160; const g = c.getContext('2d');
+      const grd = g.createLinearGradient(0, 0, 512, 0); ['#ff4081', '#ffd600', '#00e5ff', '#76ff03', '#b388ff'].forEach((col, i, a) => grd.addColorStop(i / (a.length - 1), col));
+      g.fillStyle = '#1b1f3a'; g.beginPath(); g.roundRect(6, 6, 500, 148, 28); g.fill(); g.lineWidth = 10; g.strokeStyle = grd; g.stroke();
+      g.font = '900 78px Trebuchet MS, Segoe UI, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = grd; g.fillText('SUPER RAMP!', 256, 88);
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(16, 5), new THREE.MeshBasicMaterial({ map: tex, transparent: true })); const gy = stage.groundY(l.x0 - 4) ?? l.y;
+      sign.position.set(l.x0 - 4, gy + 8.5, -2.5); sign.userData.noShadow = true; G.add(sign);
+      for (const dx of [-5.5, 5.5]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 7, 8), std(0x37474f)); post.position.set(l.x0 - 4 + dx, gy + 3.5, -2.5); G.add(post); }
+    }
     // tunnels: dark back wall with neon strips, ceiling with lamps, portal frames (the world also darkens while you are inside)
     const neon = [0x40c4ff, 0xff4081, 0xffeb3b, 0x69f0ae];
     for (const t of stage.tunnels) {
@@ -440,6 +451,8 @@ export class GameView {
   }
   event(e, now) {
     if (e.type === 'bump' && e.hit > 0.03) this._debris(e, now);
+    if (e.type === 'crash') { this._debris({ hit: 0.3, damage: 0.6, dvx: 0, x: e.x, y: e.y }, now); this.shakeCamera(0.45); }
+    if (e.type === 'super') for (let i = 0; i < 28; i++) { const a = (i / 28) * Math.PI * 2; this._puff(now, e.x, e.y + 1, Math.cos(a) * 7, Math.sin(a) * 7 + 2, 1.1, 0.3, 1.2, false, 0, [0xff4081, 0xffd600, 0x00e5ff, 0x76ff03, 0xb388ff][i % 5]); }
     if (e.type === 'flip') for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2; this._puff(now, e.x, e.y + 1, Math.cos(a) * 4, Math.sin(a) * 4 + 1, 0.8, 0.25, 0.8, false, 0, [0xff4081, 0xffd600, 0x00e5ff, 0x76ff03][i % 4]); }
     if (e.type === 'loop') for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; this._puff(now, e.x + Math.cos(a) * 5.5, e.y + Math.sin(a) * 5.5, Math.cos(a) * 2, Math.sin(a) * 2, 0.9, 0.3, 0.9, false, 0, [0xff5252, 0xffffff, 0xffeb3b, 0x40c4ff][i % 4]); }
     if (e.type === 'catapult') for (let i = 0; i < 12; i++) { const a = Math.PI * (0.1 + 0.8 * (i / 11)); this._puff(now, e.x, e.y, Math.cos(a) * 6, Math.sin(a) * 6, 0.8, 0.25, 1.0, false, 0, [0xff4081, 0xffd600, 0x00e5ff, 0x76ff03][i % 4]); }
