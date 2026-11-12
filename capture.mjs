@@ -21,7 +21,7 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 page.on('pageerror', (e) => console.error('page error:', e.message));
-await page.goto(`http://localhost:5199/?scenario=${scenario}&vehicle=${vehicle}&theme=${theme}&outcome=${outcome}`);
+await page.goto(`http://localhost:5199/render.html?scenario=${scenario}&vehicle=${vehicle}&theme=${theme}&outcome=${outcome}`);
 await page.waitForFunction(() => window.__ready, null, { timeout: 30000 });
 const duration = await page.evaluate(() => window.__duration);
 const frames = Math.round(duration * fps);

@@ -58,7 +58,7 @@ const loader = new GLTFLoader();
 
 // Loads a glb, scales it to `length` units long, rests it on y=0 and faces it toward -Z.
 export async function loadVehicle(name, length = 3.6) {
-  const gltf = await loader.loadAsync(`/models/${name}.glb`);
+  const gltf = await loader.loadAsync(`${import.meta.env.BASE_URL}models/${name}.glb`);
   const model = gltf.scene;
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
@@ -79,7 +79,7 @@ export async function loadVehicle(name, length = 3.6) {
 // Generic cached model loader. opts: { scale, center (center x/z, sit on y=0) }
 const cache = new Map();
 export async function loadModel(name, { scale = 1, center = false } = {}) {
-  if (!cache.has(name)) cache.set(name, loader.loadAsync(`/models/${name}.glb`));
+  if (!cache.has(name)) cache.set(name, loader.loadAsync(`${import.meta.env.BASE_URL}models/${name}.glb`));
   const gltf = await cache.get(name);
   const m = gltf.scene.clone(true);
   const g = new THREE.Group(); g.add(m);

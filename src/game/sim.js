@@ -1,0 +1,175 @@
+// Physics for one stage + one vehicle. Pure planck (no DOM / three) so it also runs in Node for the bot tests.
+import * as planck from 'planck';
+import { GRAVITY, vehiclePhysics } from './vehicleClass.js';
+
+const { World, Vec2, Box, Circle, Chain, Edge, WheelJoint, RevoluteJoint } = planck;
+const FRICTION = { grass: 0.9, boost: 1.0, spring: 0.9, ice: 0.05, mud: 1.1 };
+export const DT = 1 / 60;
+
+export class Sim {
+  constructor(stage, spec) {
+    this.stage = stage; this.spec = spec; this.vp = vehiclePhysics(spec);
+    this.world = new World({ gravity: new Vec2(0, -GRAVITY) });
+    this.events = []; this.time = 0; this.resets = 0; this.finished = false; this.finishTime = null;
+    this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.throttle = 0; this.cpIndex = 0; this.hint = false;
+    this.padState = new Map(); this.props = []; this.maxX = 0;
+    this._buildTerrain(); this._buildProps(); this._buildCar(); this.reset(true);
+  }
+
+  _buildTerrain() {
+    const g = this.world.createBody();
+    for (const p of this.stage.pieces) {
+      if (p.pts.length < 2) continue;
+      g.createFixture(new Chain(p.pts.map((q) => new Vec2(q[0], q[1])), false), { friction: FRICTION[p.surface] ?? 0.9, restitution: 0 });
+    }
+    for (const w of this.stage.walls) g.createFixture(new Edge(new Vec2(w[0][0], w[0][1]), new Vec2(w[1][0], w[1][1])), { friction: 0.5 });
+    for (const b of this.stage.blocks) g.createFixture(new Box(b.w / 2, b.h / 2, new Vec2(b.x, b.y), 0), { friction: 0.6 });
+    this.ground = g;
+  }
+
+  _buildProps() {
+    const w = this.world;
+    for (const p of this.stage.props) {
+      let body;
+      if (p.type === 'seesaw') {
+        const pivot = new Vec2(p.x, p.y + 0.55);
+        body = w.createBody({ type: 'dynamic', position: pivot, angle: 0.12 });
+        body.createFixture(new Box(p.len / 2, 0.16), { density: 1.2, friction: 0.9 });
+        w.createJoint(new RevoluteJoint({ enableLimit: true, lowerAngle: -0.125, upperAngle: 0.125 }, this.ground, body, pivot));
+      } else {
+        body = w.createBody({ type: 'dynamic', position: new Vec2(p.x, p.y), allowSleep: true });
+        if (p.type === 'crate') body.createFixture(new Box(p.w / 2, p.h / 2), { density: 0.35, friction: 0.5, restitution: 0.1 });
+        else if (p.type === 'barrel') body.createFixture(new Circle(p.r), { density: 0.4, friction: 0.5, restitution: 0.2 });
+        else if (p.type === 'pin') body.createFixture(new Box(p.w / 2, p.h / 2), { density: 0.3, friction: 0.5, restitution: 0.1 });
+        else if (p.type === 'ball') body.createFixture(new Circle(p.r), { density: 0.25, friction: 0.4, restitution: 0.65 });
+      }
+      this.props.push({ def: p, body, home: { x: body.getPosition().x, y: body.getPosition().y, a: body.getAngle() } });
+    }
+  }
+
+  _buildCar() {
+    const vp = this.vp, w = this.world, c = vp.chassis;
+    this.chassis = w.createBody({ type: 'dynamic', position: new Vec2(0, 5), angularDamping: 0.4 });
+    this.chassisFixture = this.chassis.createFixture(new Box(c.hx, (c.y1 - c.y0) / 2, new Vec2(0, (c.y1 + c.y0) / 2), 0), { density: vp.density, friction: 0.3, restitution: 0.05 });
+    this.chassisFixture.setUserData('chassis');
+    // low centre of mass: much harder to tip over, and kid friendly
+    const md = { mass: 0, center: new Vec2(0, 0), I: 0 };
+    this.chassis.getMassData(md);
+    const low = c.y0 + (c.y1 - c.y0) * 0.1, mm = md.mass, dc = md.center.y - low;
+    md.center = new Vec2(0, low); md.I = md.I + mm * (low * low - (md.center.y + dc) * (md.center.y + dc)) + mm * dc * dc * 0.0;
+    md.I = Math.max(md.I, mm * 0.5);
+    this.chassis.setMassData(md);
+    this.wheels = vp.axles.map((a) => {
+      const b = w.createBody({ type: 'dynamic', position: new Vec2(a.x, 5 + a.y) });
+      const f = b.createFixture(new Circle(a.r), { density: vp.density * 0.6, friction: vp.grip, restitution: 0.05 }); f.setUserData('wheel');
+      const j = w.createJoint(new WheelJoint({ motorSpeed: 0, maxMotorTorque: 0, enableMotor: true, frequencyHz: vp.freq, dampingRatio: vp.damp }, this.chassis, b, b.getPosition(), new Vec2(0, 1)));
+      return { body: b, joint: j, r: a.r, off: a };
+    });
+    const mass = this.chassis.getMass() + this.wheels.reduce((s, x) => s + x.body.getMass(), 0);
+    this.mass = mass;
+    this.torque = (mass * GRAVITY * 0.55 * vp.torque) / this.wheels.length;
+    // brake torque scales with wheel radius so a small wheel is not over-braked
+    this.inertia = this.chassis.getInertia();
+  }
+
+  _spawnPose(cp) {
+    const vp = this.vp, gx = (x) => this.stage.groundY(x);
+    let y = -1e9;
+    for (const a of vp.axles) { const g = gx(cp.x + a.x) ?? cp.y; y = Math.max(y, g + a.r - a.y); }
+    const slope = Math.atan2((gx(cp.x + 1.5) ?? cp.y) - (gx(cp.x - 1.5) ?? cp.y), 3);
+    return { x: cp.x, y: y + 0.2, a: Math.max(-0.6, Math.min(0.6, slope)) };
+  }
+
+  reset(initial = false) {
+    const cp = this.stage.checkpoints[Math.min(this.cpIndex, this.stage.checkpoints.length - 1)];
+    const p = this._spawnPose(cp), ca = Math.cos(p.a), sa = Math.sin(p.a);
+    this.chassis.setTransform(new Vec2(p.x, p.y), p.a); this.chassis.setLinearVelocity(new Vec2(0, 0)); this.chassis.setAngularVelocity(0);
+    for (const wh of this.wheels) {
+      const o = wh.off; wh.body.setTransform(new Vec2(p.x + o.x * ca - o.y * sa, p.y + o.x * sa + o.y * ca), 0);
+      wh.body.setLinearVelocity(new Vec2(0, 0)); wh.body.setAngularVelocity(0);
+    }
+    this.throttle = 0; this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.hint = false; this.dead = false;
+    this.prevV = new Vec2(0, 0); this.maxX = p.x; this.grace = 0.5;
+    if (!initial) { this.resets++; this.events.push({ type: 'reset', x: p.x, y: p.y }); }
+  }
+
+  get x() { return this.chassis.getPosition().x; }
+  get y() { return this.chassis.getPosition().y; }
+  get angle() { return this.chassis.getAngle(); }
+  get speed() { return this.chassis.getLinearVelocity().x; }
+
+  grounded() {
+    let n = 0;
+    for (const wh of this.wheels) { for (let ce = wh.body.getContactList(); ce; ce = ce.next) if (ce.contact.isTouching() && ce.other !== undefined) { n++; break; } }
+    return n;
+  }
+
+  step(gas, dt = DT) {
+    this.time += dt; this.grace = Math.max(0, this.grace - dt);
+    const vp = this.vp, pos = this.chassis.getPosition(), vel = this.chassis.getLinearVelocity(), ang = this.chassis.getAngle();
+
+    // respawn timer after falling in water
+    if (this.dead) { this.deadTimer -= dt; if (this.deadTimer <= 0) this.reset(); this.world.step(dt, 8, 3); return; }
+
+    // throttle ramps up/down so the vehicle does not jerk
+    const wantGas = gas && !this.finished;
+    this.throttle = Math.max(0, Math.min(1, this.throttle + (wantGas ? 3 : -5) * dt));
+    const grounded = this.grounded();
+    for (const wh of this.wheels) {
+      const target = this.throttle * (vp.top / wh.r);
+      wh.joint.setMotorSpeed(-target);
+      wh.joint.setMaxMotorTorque(this.finished ? this.torque * 1.2 : wantGas ? this.torque : this.torque * 0.14);
+      if (this.finished) wh.joint.setMotorSpeed(0);
+    }
+
+    // stability assist: level the vehicle in the air, gently resist flips on the ground
+    const kk = grounded ? 3 + 14 * Math.min(1, Math.abs(ang) / 0.8) : 22 * vp.level, cc = grounded ? 2.2 : 5;
+    if (Math.abs(ang) < 2.4 || !grounded) this.chassis.applyTorque(this.inertia * (-kk * ang - cc * this.chassis.getAngularVelocity()) * (this.finished ? 1.5 : 1));
+
+    // downforce at speed keeps the wheels on crests (arcade feel)
+    if (grounded && Math.abs(vel.x) > 8) this.chassis.applyForceToCenter(new Vec2(0, -this.mass * GRAVITY * 0.25 * Math.min(1, (Math.abs(vel.x) - 8) / 8)));
+
+    // pads
+    for (const pad of this.stage.pads) {
+      const inPad = this.wheels.some((wh) => { const p = wh.body.getPosition(); return p.x >= pad.x0 && p.x <= pad.x1 && p.y < pad.y + 2.5; });
+      const was = this.padState.get(pad) || false; this.padState.set(pad, inPad);
+      if (!inPad) continue;
+      if (pad.type === 'boost' && wantGas) { this.chassis.applyForceToCenter(new Vec2(Math.cos(ang) * this.mass * 22, Math.sin(ang) * this.mass * 22)); if (!was) this.events.push({ type: 'boost', x: pos.x, y: pos.y }); }
+      else if (pad.type === 'boost' && !was) this.events.push({ type: 'boost', x: pos.x, y: pos.y });
+      if (pad.type === 'spring' && !was) { for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.05, Math.max(b.getLinearVelocity().y, 0) + 17)); this.events.push({ type: 'spring', x: pos.x, y: pos.y }); }
+      if (pad.type === 'mud') for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) { const v = b.getLinearVelocity(); b.setLinearVelocity(new Vec2(v.x * 0.985, v.y)); }
+    }
+
+    this.world.step(dt, 8, 3);
+
+    // events + state
+    const v2 = this.chassis.getLinearVelocity(), dvx = v2.x - this.prevV.x, dvy = v2.y - this.prevV.y, dv = Math.hypot(dvx, dvy);
+    if (this.grace <= 0 && dv > 7) this.events.push({ type: 'bump', power: Math.min(1, dv / 22), x: pos.x, y: pos.y });
+    this.prevV = new Vec2(v2.x, v2.y);
+    this.maxX = Math.max(this.maxX, pos.x);
+    while (this.cpIndex + 1 < this.stage.checkpoints.length && pos.x > this.stage.checkpoints[this.cpIndex + 1].x) { this.cpIndex++; this.events.push({ type: 'checkpoint', x: pos.x, y: pos.y }); }
+    if (!this.finished && pos.x >= this.stage.finishX) { this.finished = true; this.finishTime = this.time; this.events.push({ type: 'finish', time: this.time, x: pos.x, y: pos.y }); }
+
+    // water / out of world
+    for (const pit of this.stage.pits) if (pos.x > pit.x0 - 1 && pos.x < pit.x1 + 1 && pos.y < pit.y - 1.2) return this._die(pit.y, pos);
+    if (pos.y < this.stage.deathY) return this._die(this.stage.deathY, pos);
+
+    // stuck / flipped hint (UI shows a big RESET hint; auto-reset if it lasts)
+    const flipped = Math.abs(ang) > 2.0 && Math.hypot(v2.x, v2.y) < 2.5;
+    this.flipTimer = flipped ? this.flipTimer + dt : 0;
+    const stalled = wantGas && Math.abs(v2.x) < 0.4 && grounded > 0;
+    this.stuckTimer = stalled ? this.stuckTimer + dt : 0;
+    this.hint = this.flipTimer > 1.5 || this.stuckTimer > 3;
+    if (this.flipTimer > 6 || this.stuckTimer > 12) this.reset();
+  }
+
+  _die(waterY, pos) { this.dead = true; this.deadTimer = 1.1; this.events.push({ type: 'splash', x: pos.x, y: waterY }); }
+
+  snapshot() {
+    const p = this.chassis.getPosition();
+    return {
+      x: p.x, y: p.y, a: this.chassis.getAngle(), dead: this.dead, hint: this.hint,
+      wheels: this.wheels.map((w) => { const q = w.body.getPosition(); return { x: q.x, y: q.y, a: w.body.getAngle() }; }),
+    };
+  }
+}

@@ -1,0 +1,3 @@
+import { defineConfig } from 'vite';
+// relative base so the built game works from any GitHub Pages sub-path
+export default defineConfig({ base: './', build: { target: 'es2022', chunkSizeWarningLimit: 1500 } });

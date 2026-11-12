@@ -13,14 +13,14 @@ export function createFade(camera, scene) {
 }
 
 // Confetti: pure function of time. update(tau) where tau = seconds since the burst (negative = hidden).
-export function createConfetti(scene, { count = 320, seed = 3, center = [0, 0, 0], spread = [9, 7, 8], yRange = [5, 10], fall = 3.2 } = {}) {
+export function createConfetti(scene, { count = 320, seed = 3, center = [0, 0, 0], spread = [9, 7, 8], yRange = [5, 10], fall = 3.2, floorY = 0.05 } = {}) {
   const r = rng(seed), palette = [0xff4081, 0xffeb3b, 0x40c4ff, 0x69f0ae, 0xff9100, 0xb388ff].map((c) => new THREE.Color(c));
   const mesh = quiet(new THREE.InstancedMesh(new THREE.BoxGeometry(0.28, 0.03, 0.18), new THREE.MeshBasicMaterial({ fog: false }), count));
   mesh.frustumCulled = false;
   const P = [];
   for (let i = 0; i < count; i++) {
     P.push({
-      x: center[0] + (r() - 0.5) * 2 * spread[0], y: yRange[0] + r() * (yRange[1] - yRange[0]), z: center[2] + (r() - 0.5) * 2 * spread[2],
+      x: center[0] + (r() - 0.5) * 2 * spread[0], y: center[1] + yRange[0] + r() * (yRange[1] - yRange[0]), z: center[2] + (r() - 0.5) * 2 * spread[2],
       d: r() * 0.9, f: 2 + r() * 3, ph: r() * 6.28, s: [r() * 9, r() * 9, r() * 9], fall: fall * (0.75 + r() * 0.5),
     });
     mesh.setColorAt(i, palette[i % palette.length]);
@@ -31,9 +31,9 @@ export function createConfetti(scene, { count = 320, seed = 3, center = [0, 0, 0
     for (let i = 0; i < count; i++) {
       const p = P[i], t = tau - p.d;
       if (t < 0) { o.scale.setScalar(0); o.updateMatrix(); mesh.setMatrixAt(i, o.matrix); continue; }
-      const tl = (p.y - 0.05) / p.fall, te = Math.min(t, tl);
+      const tl = (p.y - floorY) / p.fall, te = Math.min(t, tl);
       o.scale.setScalar(1);
-      o.position.set(p.x + Math.sin(te * p.f + p.ph) * 0.8, Math.max(0.05, p.y - p.fall * t), p.z);
+      o.position.set(p.x + Math.sin(te * p.f + p.ph) * 0.8, Math.max(floorY, p.y - p.fall * t), p.z);
       o.rotation.set(te * p.s[0], te * p.s[1], te * p.s[2]);
       o.updateMatrix(); mesh.setMatrixAt(i, o.matrix);
     }

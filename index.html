@@ -1,4 +1,78 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>3d-word-kids</title>
-<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style></head>
-<body><script type="module" src="/src/main.js"></script></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1e88e5">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E🚗%3C/text%3E%3C/svg%3E">
+<title>Vroom Stages – 100 stage car game</title>
+<style>
+  :root { --font: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #8ec9ff; font-family: var(--font); }
+  #game { position: fixed; inset: 0; }
+  #game canvas { display: block; width: 100%; height: 100%; }
+  .panel { position: fixed; background: rgba(15,30,60,.55); color: #fff; border-radius: 16px; padding: 8px 14px; backdrop-filter: blur(4px); font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  #stageBox { top: 12px; left: 12px; font-size: clamp(14px, 2.6vw, 22px); }
+  #stageBox small { display: block; font-weight: 600; opacity: .85; font-size: .72em; }
+  #prog { top: 14px; left: 50%; transform: translateX(-50%); width: min(38vw, 420px); padding: 10px 14px; }
+  #prog .bar { position: relative; height: 12px; background: rgba(255,255,255,.28); border-radius: 8px; }
+  #prog .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg,#69f0ae,#ffeb3b); border-radius: 8px; }
+  #prog .car { position: absolute; top: -9px; left: 0; font-size: 22px; transform: translateX(-50%); }
+  #prog .flag { position: absolute; top: -12px; right: -8px; font-size: 24px; }
+  #time { top: 12px; right: 12px; font-size: clamp(14px, 2.6vw, 22px); text-align: right; }
+  #time small { display: block; opacity: .85; font-weight: 600; font-size: .72em; }
+  .iconbtn { position: fixed; top: 72px; width: 46px; height: 46px; border-radius: 14px; border: 0; background: rgba(15,30,60,.55); color: #fff; font-size: 22px; cursor: pointer; }
+  #menuBtn { right: 12px; } #muteBtn { right: 66px; }
+  .big { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom)); border: 0; border-radius: 50%; width: clamp(110px, 22vmin, 190px); height: clamp(110px, 22vmin, 190px); color: #fff; font-family: var(--font); font-weight: 900; cursor: pointer; box-shadow: 0 8px 0 rgba(0,0,0,.28), 0 12px 24px rgba(0,0,0,.3); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: transform .05s, box-shadow .05s; }
+  .big span.main { font-size: clamp(26px, 6vmin, 46px); letter-spacing: 1px; }
+  .big span.hint { font-size: clamp(11px, 2.2vmin, 15px); opacity: .85; font-weight: 700; }
+  .big.down { transform: translateY(6px); box-shadow: 0 2px 0 rgba(0,0,0,.28), 0 4px 10px rgba(0,0,0,.3); }
+  #gas { right: calc(20px + env(safe-area-inset-right)); background: radial-gradient(circle at 35% 30%, #7dff9b, #17b24a 70%); }
+  #reset { left: calc(20px + env(safe-area-inset-left)); background: radial-gradient(circle at 35% 30%, #ffc36b, #f57c00 70%); }
+  #reset.pulse { animation: pulse .6s infinite alternate; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.14); } }
+  #msg { position: fixed; left: 50%; top: 38%; transform: translate(-50%,-50%); text-align: center; color: #fff; font-weight: 900; font-size: clamp(26px, 6vw, 64px); text-shadow: 0 4px 0 rgba(0,0,0,.3), 0 0 24px rgba(0,0,0,.35); pointer-events: none; white-space: pre-line; line-height: 1.1; }
+  #msg small { display: block; font-size: .42em; font-weight: 700; margin-top: 10px; opacity: .95; }
+  .stars { font-size: 1.1em; letter-spacing: 6px; }
+  #loading { position: fixed; inset: 0; background: linear-gradient(#5eb6ff,#c9ecff); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 34px; font-weight: 900; text-shadow: 0 3px 0 rgba(0,0,0,.25); z-index: 20; }
+  #menu { position: fixed; inset: 0; background: rgba(8,20,45,.82); z-index: 30; display: none; overflow: auto; padding: 18px; touch-action: pan-y; }
+  #menu.open { display: block; }
+  #menu h2 { color: #fff; margin: 4px 0 4px; font-size: 28px; }
+  #menu p { color: #bcd; margin: 0 0 14px; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 10px; max-width: 1100px; margin: 0 auto; }
+  #grid button { border: 0; border-radius: 14px; padding: 10px 4px 8px; background: #1e88e5; color: #fff; font-family: var(--font); font-weight: 900; font-size: 22px; cursor: pointer; line-height: 1.1; touch-action: manipulation; }
+  #grid button small { display: block; font-size: 11px; font-weight: 600; opacity: .9; height: 14px; overflow: hidden; }
+  #grid button .st { display: block; font-size: 13px; letter-spacing: 1px; color: #ffe066; min-height: 16px; }
+  #grid button.cur { outline: 4px solid #ffeb3b; } #grid button.done { background: #2e9e5b; }
+  #menuClose { position: sticky; top: 0; float: right; border: 0; border-radius: 12px; background: #ff5252; color: #fff; font-size: 20px; font-weight: 900; padding: 10px 16px; cursor: pointer; touch-action: manipulation; }
+  .menurow { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .menurow button { border: 0; border-radius: 12px; background: #ffb300; color: #222; font-family: var(--font); font-weight: 800; font-size: 16px; padding: 10px 16px; cursor: pointer; touch-action: manipulation; }
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div class="panel" id="stageBox"><span id="stageNum">Stage 1</span><small id="vehName"></small></div>
+<div class="panel" id="prog"><div class="bar"><div class="fill" id="progFill"></div><div class="car" id="progCar">🚗</div><div class="flag">🏁</div></div></div>
+<div class="panel" id="time"><span id="timeNow">0.0s</span><small id="timeBest"></small></div>
+<button class="iconbtn" id="muteBtn" title="Sound">🔊</button>
+<button class="iconbtn" id="menuBtn" title="Stages">☰</button>
+
+<div id="msg"></div>
+
+<button class="big" id="reset"><span class="main">↺</span><span class="hint">RESET · R</span></button>
+<button class="big" id="gas"><span class="main">GAS</span><span class="hint">hold · SPACE</span></button>
+
+<div id="menu">
+  <button id="menuClose">✕ Close</button>
+  <h2>Choose a stage</h2>
+  <p>100 stages · new vehicle & obstacles each time · stars for fast times</p>
+  <div class="menurow"><button id="restartBtn">↻ Restart this stage</button><button id="musicBtn">🎵 Music: on</button><button id="resetProgress">🗑 Clear stars</button></div>
+  <div id="grid"></div>
+</div>
+
+<div id="loading">Loading…</div>
+<script type="module" src="/src/game/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+// Turns a stage definition (a list of segments) into terrain + props. Pure data, no rendering/physics.
+// Coordinates: x forward, y up, metres.
+export function mulberry32(a) {
+  return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+const sm = (t) => t * t * (3 - 2 * t);
+const STEP = 0.8;
+
+export function buildStage(def) {
+  const rng = mulberry32(def.seed || 1);
+  const S = { def, pieces: [], walls: [], props: [], pads: [], pits: [], blocks: [], checkpoints: [] };
+  let x = 0, y = 0, cur = { surface: 'grass', pts: [[0, 0]] }, lastCp = -999;
+
+  const push = (nx, ny) => { cur.pts.push([nx, ny]); x = nx; y = ny; };
+  const piece = (surface) => { if (cur.pts.length > 1) S.pieces.push(cur); cur = { surface, pts: [[x, y]] }; };
+  const profile = (len, fn) => { const x0 = x, y0 = y, n = Math.max(1, Math.ceil(len / STEP)); for (let i = 1; i <= n; i++) push(x0 + (len * i) / n, y0 + fn(i / n)); };
+  const flat = (len, surface = 'grass') => { if (surface !== cur.surface) piece(surface); profile(len, () => 0); if (surface !== 'grass') piece('grass'); };
+  const groundAt = () => y;
+  const checkpoint = () => { if (x - lastCp > 85) { S.checkpoints.push({ x, y }); lastCp = x; } };
+
+  const SEG = {
+    flat: (s) => flat(s.len, s.surf),
+    slope: (s) => { profile(s.len, (t) => s.dy * sm(t)); flat(3); },
+    hills: (s) => { profile(s.len, (t) => s.amp * Math.sin(Math.PI * 2 * s.waves * t)); flat(3); },
+    bumps: (s) => { for (let i = 0; i < s.n; i++) { profile(s.w, (t) => s.h * Math.sin(Math.PI * t)); flat(s.gap ?? 3); } },
+    logs: (s) => { for (let i = 0; i < s.n; i++) { flat(s.gap ?? 6); S.blocks.push({ x: x + 0.35, y: y + s.h / 2, w: 0.7, h: s.h }); flat(1.2); } flat(3); },
+    steps: (s) => { for (let i = 0; i < s.n; i++) { push(x, y + s.h); flat(s.run); } flat(2); },
+    jump: (s) => { // runup, kicker ramp, pit, landing
+      flat(s.runup); profile(s.rampLen, (t) => s.rise * t);
+      const lipX = x, lipY = y, landX = x + s.w, landY = y + s.landDy;
+      piece('grass');
+      S.walls.push([[lipX, lipY], [lipX, lipY - 7]], [[landX, landY - 7], [landX, landY]]);
+      S.pits.push({ x0: lipX, x1: landX, y: Math.min(lipY, landY) - 3 });
+      x = landX; y = landY; cur = { surface: 'grass', pts: [[x, y]] };
+      flat(10);
+    },
+    crates: (s) => {
+      flat(2);
+      for (let c = 0; c < s.cols; c++) for (let r = 0; r < s.rows; r++) S.props.push({ type: 'crate', x: x + 1.5 + c * s.size, y: y + s.size / 2 + r * s.size, w: s.size, h: s.size });
+      flat(s.cols * s.size + 4);
+    },
+    barrels: (s) => { flat(2); for (let i = 0; i < s.n; i++) S.props.push({ type: 'barrel', x: x + 1 + (i % 4) * 1.0 + Math.floor(i / 4) * 0.5, y: y + 0.5 + Math.floor(i / 4) * 1.0, r: 0.5 }); flat(6); },
+    pins: (s) => { flat(2); for (let i = 0; i < s.n; i++) S.props.push({ type: 'pin', x: x + 1.5 + i * 1.3, y: y + 0.9, w: 0.4, h: 1.8 }); flat(s.n * 1.3 + 4); },
+    balls: (s) => { flat(2); for (let i = 0; i < s.n; i++) S.props.push({ type: 'ball', x: x + 1 + (i % 6) * 1.1, y: y + 0.6 + Math.floor(i / 6) * 1.1, r: 0.55, ci: i % 6 }); flat(10); },
+    seesaw: (s) => { flat(3); S.props.push({ type: 'seesaw', x: x + s.len / 2, y, len: s.len }); flat(s.len + 3); },
+    boost: (s) => { flat(2); S.pads.push({ type: 'boost', x0: x, x1: x + s.len, y }); flat(s.len, 'boost'); flat(2); },
+    spring: (s) => { flat(2); S.pads.push({ type: 'spring', x0: x, x1: x + 4, y }); flat(4, 'spring'); flat(6); },
+    ice: (s) => { flat(2); flat(s.len, 'ice'); flat(2); },
+    mud: (s) => { flat(2); S.pads.push({ type: 'mud', x0: x, x1: x + s.len, y }); flat(s.len, 'mud'); flat(2); },
+  };
+
+  flat(20); // start area
+  for (const seg of def.segs) { SEG[seg.t](seg); checkpoint(); }
+  flat(8); const finishX = x; flat(22); piece('grass');
+  S.pieces.push(cur);
+
+  // ground height lookup (null over pits)
+  const flatPieces = S.pieces.map((p) => ({ x0: p.pts[0][0], x1: p.pts[p.pts.length - 1][0], pts: p.pts })).filter((p) => p.x1 > p.x0).sort((a, b) => a.x0 - b.x0);
+  S.groundY = (px) => {
+    for (const p of flatPieces) {
+      if (px < p.x0 || px > p.x1) continue;
+      let lo = 0, hi = p.pts.length - 1;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (p.pts[m][0] <= px) lo = m; else hi = m; }
+      const a = p.pts[lo], b = p.pts[hi], t = b[0] === a[0] ? 0 : (px - a[0]) / (b[0] - a[0]);
+      return a[1] + (b[1] - a[1]) * t;
+    }
+    return null;
+  };
+  S.start = { x: 7, y: S.groundY(7) };
+  S.checkpoints.unshift({ x: 7, y: S.start.y });
+  S.finishX = finishX; S.length = x;
+  S.minY = Math.min(...S.pieces.flatMap((p) => p.pts.map((q) => q[1])));
+  S.deathY = S.minY - 45;
+  return S;
+}
