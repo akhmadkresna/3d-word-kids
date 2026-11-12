@@ -9,7 +9,7 @@ import { Recorder } from './recorder.js';
 
 const $ = (id) => document.getElementById(id);
 const specById = Object.fromEntries(SPECS.map((s) => [s.id, s]));
-const SAVE = 'vroom-stages-v2'; // bumped when stage content changed
+const SAVE = 'vroom-stages-v3'; // bumped when stage content changed
 const save = (() => { try { return JSON.parse(localStorage.getItem(SAVE)) || {}; } catch { return {}; } })();
 save.stars ||= {}; save.best ||= {}; save.order ||= 'seq';
 const persist = () => { try { localStorage.setItem(SAVE, JSON.stringify(save)); } catch {} };
@@ -50,6 +50,10 @@ function doReset() {
   if (state === 'ready') { restartStage(); return; }
   sim.reset(); audio.play({ type: 'reset' });
 }
+
+// ---------- big-air popups ----------
+let lastPop = -9, lastTrickDir = 1;
+function pop(text, big = false) { const el = $('pop'); el.textContent = text; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); lastPop = now; }
 
 // ---------- UI ----------
 const setMsg = (html) => { $('msg').innerHTML = html; };
@@ -156,13 +160,16 @@ function frame(tms) {
         audio.play(e); view.event(e, now);
         if (e.type === 'bump' && e.power > 0.5) view.shakeCamera(0.25 * e.power);
         if (e.type === 'finish') onFinish(e);
+        if (e.type === 'trick') lastTrickDir = e.dir;
+        if (e.type === 'flip') pop(e.n > 1 ? '🌀🌀 DOUBLE FLIP!!' : lastTrickDir > 0 ? '🌀 BACKFLIP!' : '🌀 FRONT FLIP!');
+        if (e.type === 'air' && e.time > 2.0 && now - lastPop > 0.6) pop(`🚀 AIRTIME ${e.time.toFixed(1)}s!`);
       }
       sim.events.length = 0;
     }
     if (acc > DT * 6) acc = 0;
     view.update(sim, now, dt);
     audio.engine(sim.throttle, sim.speed, !sim.dead, sim.damage); audio.rumble(sim.rumble || 0);
-    $('starNow').textContent = sim.starsGot; $('starTot').textContent = sim.starsTotal;
+    $('flipNow').textContent = sim.flips; $('starNow').textContent = sim.starsGot; $('starTot').textContent = sim.starsTotal;
     $('dmgFill').style.width = `${Math.round(sim.damage * 100)}%`; $('dmgFill').style.background = `hsl(${Math.round(120 - 120 * sim.damage)},80%,55%)`;
 
     const def = curDef, prog = Math.max(0, Math.min(1, sim.x / stage.finishX));

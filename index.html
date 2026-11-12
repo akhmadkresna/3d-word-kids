@@ -41,6 +41,9 @@
   #msg { position: fixed; left: 50%; top: 38%; transform: translate(-50%,-50%); text-align: center; color: #fff; font-weight: 900; font-size: clamp(26px, 6vw, 64px); text-shadow: 0 4px 0 rgba(0,0,0,.3), 0 0 24px rgba(0,0,0,.35); pointer-events: none; white-space: pre-line; line-height: 1.1; }
   #msg small { display: block; font-size: .42em; font-weight: 700; margin-top: 10px; opacity: .95; }
   .stars { font-size: 1.1em; letter-spacing: 6px; }
+  #pop { position: fixed; left: 50%; top: 24%; transform: translate(-50%,-50%); color: #fff; font-weight: 900; font-size: clamp(30px, 7vw, 78px); text-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 22px rgba(255,64,129,.9); pointer-events: none; opacity: 0; white-space: nowrap; letter-spacing: 1px; }
+  #pop.show { animation: popin 1.3s ease-out; }
+  @keyframes popin { 0% { opacity: 0; transform: translate(-50%,-30%) scale(.4); } 14% { opacity: 1; transform: translate(-50%,-50%) scale(1.18); } 30% { transform: translate(-50%,-50%) scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-90%) scale(1.05); } }
   #loading { position: fixed; inset: 0; background: linear-gradient(#5eb6ff,#c9ecff); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 34px; font-weight: 900; text-shadow: 0 3px 0 rgba(0,0,0,.25); z-index: 20; }
   #recExit { display: none; height: 34px; min-width: 34px; border: 0; border-radius: 10px; background: rgba(15,30,60,.35); color: #fff; font-size: 16px; opacity: .45; cursor: pointer; }
   body.rec #recExit { display: block; } body.rec #tools { display: none; }
@@ -64,13 +67,14 @@
 <div id="topbar">
   <div class="panel" id="stageBox"><span id="stageNum">Stage 1</span><small id="vehName"></small><div class="dmg" title="Damage"><i id="dmgFill"></i></div></div>
   <div class="panel" id="prog"><div class="bar"><div class="fill" id="progFill"></div><div class="car" id="progCar">🚗</div><div class="flag">🏁</div></div></div>
-  <div class="panel" id="starsBox">⭐ <span id="starNow">0</span>/<span id="starTot">0</span></div>
+  <div class="panel" id="starsBox">⭐ <span id="starNow">0</span>/<span id="starTot">0</span> · 🌀 <span id="flipNow">0</span></div>
   <div class="panel" id="time"><span id="timeNow">0.0s</span><small id="timeBest"></small></div>
   <div id="tools"><button class="iconbtn" id="randBtn" title="Random stage">🎲</button><button class="iconbtn" id="muteBtn" title="Sound">🔊</button><button class="iconbtn" id="menuBtn" title="Choose a stage (Esc)">☰ Stages</button></div>
   <button id="recExit" title="Stop recording mode">⏹</button>
 </div>
 
 <div id="msg"></div>
+<div id="pop"></div>
 
 <button class="big" id="reset"><span class="main">↺</span><span class="hint">RESET · R</span></button>
 <button class="big" id="gas"><span class="main">GAS</span><span class="hint">hold · SPACE</span></button>

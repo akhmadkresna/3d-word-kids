@@ -12,10 +12,13 @@ Built to play with kids — and to record: one video can cover many stages (the 
 Extras: the **☰ Stages** button (or `Esc`) opens the stage picker (any stage, restart, music on/off). **🎲** jumps to a random stage, and the menu can switch auto-advance between *in order* and *random* (handy for recording). Direct link to a stage: `…/#37`.
 Finish a stage → ★ rating by time (par is based on a test bot) → next stage starts automatically (or press GAS).
 
-## What makes a track fun (for 2-5 year olds)
-No boring flat roads: the ground between obstacles rolls, and **every stage has a ramp jump and a HIGH CLIMB** (a mountain from 13 m on stage 1 up to ~50 m, sometimes ending in a cliff).
-⭐ **Stars and 🎈 balloons** float along every track (over jumps, up mountains, on hill crests); drive through them for a sparkle + a rising "ding" combo. The counter is in the top bar.
-Also: tall **ski jumps** into cliff landings, **roller-coaster hills** for airtime, boost-pad long jumps, ferries, springs, drops, ice, mud and more.
+## What makes it fun (tuned from real play-testing with kids)
+Kids got bored fast on long calm tracks and loved **ramps that fling the car and lots of bumps**, so the game is built around that:
+- **Floaty, bouncy physics:** reduced gravity in the air (long hang time), soft bouncy suspension and wheels, vehicles 20 % faster, and every stage starts by rolling down a drop-in slope so the action begins immediately.
+- **Every stage = a RAMP TRAIN** (3-4 launch ramps back to back, each one throws you ~40 m) **+ a BUMP FIELD** (10-16 big psychedelic bouncy bumps) **+ one showpiece/bumpy obstacle**, with small bumps instead of flat road in between. Stages are ~20-30 s.
+- **Automatic mid-air flips:** on any big jump the car does a backflip / front flip / double flip (visual, always lands safely) with a 🌀 counter and a "BACKFLIP!" / "DOUBLE FLIP!!" / "AIRTIME 2.4s!" popup; the camera pulls back during big air.
+- ⭐ stars and 🎈 balloons along the way, cheering animals, loops, rainbow bridges, tunnels, mushrooms.
+`npm run` / `node tools/fun-metrics.mjs` measures it: airtime went from 24 % to 52 %, big jumps (>0.8 s) from 4 to ~11 per minute, longest calm stretch from 2.6 s to 1.3 s.
 
 ## Showpieces and friends
 - **Cheering animals** (bunny, chick, bear, frog, sheep, pig) stand along every track and a crowd waits at the finish; they jump, wave and squeak as the vehicle passes.

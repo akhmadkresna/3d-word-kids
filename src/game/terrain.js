@@ -95,6 +95,16 @@ export function buildStage(def) {
       }
       flat(10);
     },
+    rampTrain: (s) => { // launch ramps back to back: each one throws the vehicle across a long flat landing zone into the next ramp
+      for (let i = 0; i < s.n; i++) {
+        flat(i ? s.land : s.runup); profile(s.rampLen, (t) => s.rise * t); const lx = x, ly = y; push(x, y - s.rise); // cliff right behind the lip
+        starArc(lx, ly, lx + s.land * 0.9, ly - s.rise, 4.5 + s.rise, 6);
+      }
+      flat(s.land);
+    },
+    bumpfield: (s) => { // a field of big bouncy bumps in psychedelic colours: the vehicle bounces and jumps from bump to bump
+      piece('funk'); for (let i = 0; i < s.n; i++) profile(s.ws[i], (t) => s.hs[i] * Math.sin(Math.PI * t)); piece('grass'); flat(3);
+    },
     funk: (s) => { // funky bumps: random shapes (round, spike, camel, plateau) in psychedelic colours
       piece('funk');
       for (let i = 0; i < s.n; i++) {
@@ -137,7 +147,8 @@ export function buildStage(def) {
     mud: (s) => { flat(2); S.pads.push({ type: 'mud', x0: x, x1: x + s.len, y }); flat(s.len, 'mud'); flat(2); },
   };
 
-  flat(20); // start area
+  if (def.dropIn) { flat(9); profile(16, (t) => -7 * sm(t)); flat(6); } // start on a platform and roll down a slope: speed from the first second
+  else flat(20); // start area
   for (const seg of def.segs) {
     const x0 = x; SEG[seg.t](seg); checkpoint();
     if (seg.t !== 'flat') { starLine(x0 + 3, x - 3); if (crng() < 0.7 && seg.t !== 'ferry') balloons(x0 + 4, x - 4, 3 + Math.floor(crng() * 3)); }

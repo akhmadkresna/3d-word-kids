@@ -378,6 +378,7 @@ export class GameView {
   }
   event(e, now) {
     if (e.type === 'bump' && e.hit > 0.03) this._debris(e, now);
+    if (e.type === 'flip') for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2; this._puff(now, e.x, e.y + 1, Math.cos(a) * 4, Math.sin(a) * 4 + 1, 0.8, 0.25, 0.8, false, 0, [0xff4081, 0xffd600, 0x00e5ff, 0x76ff03][i % 4]); }
     if (e.type === 'loop') for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; this._puff(now, e.x + Math.cos(a) * 5.5, e.y + Math.sin(a) * 5.5, Math.cos(a) * 2, Math.sin(a) * 2, 0.9, 0.3, 0.9, false, 0, [0xff5252, 0xffffff, 0xffeb3b, 0x40c4ff][i % 4]); }
     if (e.type === 'catapult') for (let i = 0; i < 12; i++) { const a = Math.PI * (0.1 + 0.8 * (i / 11)); this._puff(now, e.x, e.y, Math.cos(a) * 6, Math.sin(a) * 6, 0.8, 0.25, 1.0, false, 0, [0xff4081, 0xffd600, 0x00e5ff, 0x76ff03][i % 4]); }
     if (e.type === 'shroom') for (let i = 0; i < 10; i++) { const a = Math.PI * (0.15 + 0.7 * (i / 9)); this._puff(now, e.x, e.y, Math.cos(a) * 5, Math.sin(a) * 5, 0.8, 0.25, 0.9, false, 0, i % 2 ? 0xffffff : 0xff5a5a); }
@@ -398,7 +399,7 @@ export class GameView {
     const snap = sim.snapshot(), car = this.carOuter;
     // vehicle + wheels
     const rj = sim.rumble || 0; // washboard: the vehicle rattles
-    car.position.set(snap.x, snap.y + Math.sin(now * 91) * 0.04 * rj, 0); car.rotation.z = snap.a + Math.sin(now * 77) * 0.012 * rj;
+    car.position.set(snap.x, snap.y + Math.sin(now * 91) * 0.04 * rj, 0); car.rotation.z = snap.a + (sim.trickAngle ? sim.trickAngle() : 0) + Math.sin(now * 77) * 0.012 * rj;
     const ca = Math.cos(-snap.a), sa = Math.sin(-snap.a), s = this.vp.scale;
     for (const wn of this.wheelNodes) {
       const w = snap.wheels[wn.axle], dx = w.x - snap.x, dy = w.y - snap.y;
@@ -410,6 +411,7 @@ export class GameView {
     const spd = Math.abs(sim.speed), k = 1 - Math.exp(-dt * 3.2);
     let tx = snap.x + Math.min(9, spd * 0.55 + 3), ty = snap.y + 1.8, td = 24 + Math.min(13, spd * 0.5);
     if (sim.loop) { tx = sim.loop.cx; ty = sim.loop.cy; td = 26 + sim.loop.l.R * 2.4; } // frame the whole ring while looping
+    else { const airK = Math.max(0, Math.min(1, (sim.airT - 0.25) / 0.9)); td += 9 * airK; ty += 2.6 * airK; tx += 3 * airK; } // big air: pull back and look ahead
     if (!sim.dead) { // while the car is in the water the camera stays put so the splash is visible
       this.cam.x += (tx - this.cam.x) * k; this.cam.y += (ty - this.cam.y) * (1 - Math.exp(-dt * 2.2));
     }

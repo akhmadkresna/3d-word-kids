@@ -3,7 +3,7 @@ import { mulberry32 } from './terrain.js';
 import { vehiclePhysics, GRAVITY } from './vehicleClass.js';
 
 export const THEMES = ['meadow', 'desert', 'snow', 'sunset', 'candy', 'night'];
-const UNLOCK = { hills: 1, bumps: 1, jump: 1, mountain: 1, washboard: 2, roller: 3, shrooms: 3, tunnel: 4, skijump: 5, rainbow: 6, loop: 7, boost: 2, slope: 4, crates: 6, drop: 8, funk: 4, whoops: 5, launcher: 8, barrels: 8, boostjump: 12, pins: 14, balls: 16, logs: 18, ice: 20, ferry: 20, seesaw: 24, spring: 28, steps: 30, mud: 34 };
+const UNLOCK = { hills: 1, bumps: 1, jump: 1, mountain: 1, rampTrain: 1, bumpfield: 1, washboard: 2, roller: 3, shrooms: 3, tunnel: 4, skijump: 5, rainbow: 6, loop: 7, boost: 2, slope: 4, crates: 6, drop: 8, funk: 4, whoops: 5, launcher: 8, barrels: 8, boostjump: 12, pins: 14, balls: 16, logs: 18, ice: 20, ferry: 20, seesaw: 24, spring: 28, steps: 30, mud: 34 };
 const lerp = (a, b, t) => a + (b - a) * t;
 
 export function segLength(s) {
@@ -18,6 +18,8 @@ export function segLength(s) {
     case 'ferry': return s.runup + s.w + 14;
     case 'drop': return s.len + s.h * 4.5 + 10;
     case 'mountain': return 10 + s.up + s.plateau + s.down + 4;
+    case 'rampTrain': return s.runup + s.n * (s.rampLen + s.land) + s.land - s.land * 0 ;
+    case 'bumpfield': return s.ws.reduce((a, b) => a + b, 0) + 3;
     case 'skijump': return s.runup + s.rampLen + 12 + (s.drop - s.rise) * 4.5 + 4;
     case 'roller': return s.n * s.w + 3;
     case 'loop': { const n = s.n || 1; return s.runup + 6 * (n - 1) + n * 17 + (n - 1) * (s.R + 6) + s.R + 12; }
@@ -44,17 +46,17 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
   const boss = k % 10 === 0, ease = Math.max(0.3, 1 - attempt * 0.12);
   const d = Math.min(1, (k / 100 + (boss ? 0.08 : 0))) * ease;
   const theme = opts.theme || THEMES[(k - 1) % THEMES.length];
-  const target = Math.min(opts.maxLen || 1e9, lerp(280, 600, k / 100) * (boss ? 1.2 : 1) * lerp(0.85, 1.15, rnd()));
+  const target = Math.min(opts.maxLen || 1e9, lerp(170, 380, k / 100) * (boss ? 1.2 : 1) * lerp(0.85, 1.15, rnd()));
   const avail = Object.keys(UNLOCK).filter((t) => UNLOCK[t] <= k);
   const weights = Object.fromEntries(avail.map((t) => [t, 1]));
   if (theme === 'snow' && weights.ice) weights.ice = 3;
   if (theme === 'desert' && weights.mud) weights.mud = 2;
   if (k < 10) { weights.hills = 2; weights.bumps = 1; }
-  weights.jump = k < 10 ? 2 : 1.6; // jumps over gaps are the signature obstacle
+  weights.jump = k < 10 ? 1.6 : 1.3; // jumps over gaps are the signature obstacle
   if (weights.boostjump) weights.boostjump = 2;
   if (weights.ferry) weights.ferry = 1.5;
   if (weights.drop) weights.drop = 2;
-  weights.mountain = 0.8; if (weights.loop) weights.loop = 1.6; if (weights.rainbow) weights.rainbow = 1.6; if (weights.tunnel) weights.tunnel = 1.2; if (weights.shrooms) weights.shrooms = 1.6;
+  weights.mountain = 0.35; if (weights.loop) weights.loop = 1.6; if (weights.rainbow) weights.rainbow = 1.6; if (weights.tunnel) weights.tunnel = 1.2; if (weights.shrooms) weights.shrooms = 1.6;
   for (const t of ['funk', 'washboard', 'whoops', 'launcher']) if (weights[t]) weights[t] = 2.2; // the bumpy, flying and shaking obstacles are favourites if (weights.roller) weights.roller = 2.5; if (weights.skijump) weights.skijump = 2;
   for (const t of opts.avoid || []) if (weights[t] && t !== 'jump') weights[t] *= 0.3;
   const pick = () => { const tot = Object.values(weights).reduce((a, b) => a + b, 0); let x = rnd() * tot; for (const [t, w] of Object.entries(weights)) { if ((x -= w) <= 0) return t; } return 'hills'; };
@@ -90,6 +92,15 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
       const rise = +(lerp(4, 8, d) * (0.85 + rnd() * 0.3)).toFixed(1), drop = +(rise * 1.15 + lerp(2, 5, d)).toFixed(1);
       return { t: 'skijump', runup: +lerp(28, 36, rnd()).toFixed(1), rampLen: +(rise / 0.55).toFixed(1), rise, drop };
     },
+    rampTrain() { // launch ramps back to back; the landing zone is sized to how far this vehicle flies
+      const rise = +(lerp(2.8, 4.8, d) * (0.85 + rnd() * 0.3)).toFixed(1), land = +Math.max(30, Math.min(46, vp.top * 1.7)).toFixed(0);
+      return { t: 'rampTrain', n: 2 + Math.floor(d * 2.4 + rnd() * 0.8), runup: 16, rampLen: +(rise / 0.55).toFixed(1), rise, land };
+    },
+    bumpfield() { // 10-16 big bouncy bumps, heights limited by wheel size and bump width
+      const n = 10 + Math.floor(rnd() * 5 + d * 4), ws = [], hs = [];
+      for (let i = 0; i < n; i++) { const w = +lerp(3.6, 5.6, rnd()).toFixed(1); ws.push(w); hs.push(+Math.min(r * 2.3, w * 0.2, lerp(0.55, 1.25, rnd()) * (0.8 + d * 0.4)).toFixed(2)); }
+      return { t: 'bumpfield', n, ws, hs };
+    },
     funk() { // random funky bump shapes, sized to the vehicle's wheels
       const n = 4 + Math.floor(d * 3 + rnd() * 2), shapes = [], w = [], h = [], gap = [];
       const WIDTH = [[4, 7], [4, 6], [6.5, 8.5], [5, 7]]; // round, spike, camel (two humps), plateau: narrow shapes get steep, so each has a minimum width
@@ -114,34 +125,28 @@ export function generateStage(k, spec, attempt = 0, opts = {}) {
     mud() { return { t: 'mud', len: +lerp(14, 28, rnd()).toFixed(1) }; },
   };
 
-  const segs = []; let total = 20 + 30, drift = 0, last = '', featureCount = 0;
-  // every stage: a ramp jump, a HIGH CLIMB, and one showpiece (loop / rainbow bridge / tunnel / bouncy mushrooms)
+  const segs = []; let total = 16 + 16 + 6, drift = 0, last = '', featureCount = 0;
+  // PACE: no flat filler. Every stage = a RAMP TRAIN (flying!) + a BUMP FIELD (bouncing!) + one showpiece or favourite bumpy obstacle.
   const showpieces = ['shrooms', 'tunnel', 'rainbow', 'loop'].filter((t) => UNLOCK[t] <= k);
-  const classics = Object.keys(weights).filter((t) => !['jump', 'mountain', 'shrooms', 'tunnel', 'rainbow', 'loop', 'hills', 'slope'].includes(t));
-  const bumpy = ['washboard', 'funk', 'whoops', 'launcher'].filter((t) => weights[t]); // bumpy / flying / shaking obstacles: favourites
-  const pickClassic = () => { if (bumpy.length && rnd() < 0.5) return bumpy[Math.floor(rnd() * bumpy.length)]; const tot = classics.reduce((a, t) => a + weights[t], 0); let x = rnd() * tot; for (const t of classics) { if ((x -= weights[t]) <= 0) return t; } return classics[0] || 'bumps'; };
-  const extras = [...(showpieces.length ? [showpieces[Math.floor(rnd() * showpieces.length)]] : []), ...(classics.length ? [pickClassic()] : [])];
-  if (rnd() < 0.5) extras.reverse();
-  if (opts.maxLen) extras.length = Math.min(extras.length, 1); // recording mode: shorter stages (one showpiece/classic obstacle)
-  const forced = ['jump', 'mountain', ...extras];
+  const bumpy = ['washboard', 'funk', 'whoops', 'launcher', 'jump'].filter((t) => weights[t]);
+  const classics = Object.keys(weights).filter((t) => !['jump', 'mountain', 'shrooms', 'tunnel', 'rainbow', 'loop', 'hills', 'slope', 'rampTrain', 'bumpfield'].includes(t));
+  const third = rnd() < 0.55 && showpieces.length ? showpieces[Math.floor(rnd() * showpieces.length)] : bumpy[Math.floor(rnd() * bumpy.length)];
+  const fourth = classics.length && !opts.maxLen && rnd() < 0.6 ? classics[Math.floor(rnd() * classics.length)] : null;
+  const forced = ['rampTrain', 'bumpfield', third, ...(fourth ? [fourth] : [])];
+  if (rnd() < 0.5) { const t = forced[0]; forced[0] = forced[1]; forced[1] = t; }
   while (total < target || featureCount < forced.length) {
-    const gap = +lerp(8, 18, rnd() * (1 - d * 0.4)).toFixed(1);
-    // never a boring flat road: most gaps between obstacles are gently rolling hills
-    if (rnd() < 0.5) { const waves = gap > 14 ? 2 : 1; segs.push({ t: 'hills', len: gap, amp: +Math.min(lerp(0.5, 1.3, rnd()), (0.55 * gap) / (Math.PI * 2 * waves)).toFixed(2), waves }); } else segs.push({ t: 'flat', len: gap });
-    total += gap + 3;
+    // between features: a couple of small bumps (or nothing) - never an empty road
+    if (featureCount > 0) { const sb = { t: 'bumps', n: 2, h: +Math.min(0.4, r * 0.8).toFixed(2), w: 3.6, gap: 2 }; if (rnd() < 0.7) { segs.push(sb); total += segLength(sb); } else { segs.push({ t: 'flat', len: 4 }); total += 4; } }
     let type = forced[featureCount] || pick();
     if (!forced[featureCount] && type === last && rnd() < 0.7) type = pick(); last = type; featureCount++;
     let s = g[type]();
-    if (s.t === 'mountain') { // keep the stage length sane: a tall climb needs ~6.3 m of track per metre of height
-      const room = Math.max(8, (target - total) / 6.4); if (s.h > room) { const h = +room.toFixed(1), cliff = s.cliff ? +(h * 0.35).toFixed(1) : 0; s = { ...s, h, up: +(h * 3).toFixed(1), cliff, down: +((h - cliff) * 3.3).toFixed(1) }; }
-    }
+    if (s.t === 'mountain') { const room = Math.max(8, (target - total) / 6.4); if (s.h > room) { const h = +room.toFixed(1), cliff = s.cliff ? +(h * 0.35).toFixed(1) : 0; s = { ...s, h, up: +(h * 3).toFixed(1), cliff, down: +((h - cliff) * 3.3).toFixed(1) }; } }
     if (s.t === 'slope') { if (drift > 10 && s.dy > 0) s.dy = -s.dy; if (drift < -10 && s.dy < 0) s.dy = -s.dy; drift += s.dy; }
     if (s.t === 'jump') drift += s.rise + s.landDy;
     segs.push(s); total += segLength(s);
-    // later stages: chain a second jump right after the first
     if (s.t === 'jump' && k >= 15 && rnd() < 0.35) { const j2 = g.jump(true); drift += j2.rise + j2.landDy; segs.push(j2); total += segLength(j2); }
   }
   // pull the stage back to roughly its starting height so it never drifts off screen
   if (Math.abs(drift) > 3) segs.push({ t: 'slope', len: Math.min(80, Math.abs(drift) * 4 + 12), dy: -drift });
-  return { k, vehicle: spec.id, theme, seed, attempt, boss, segs, expectedLength: Math.round(total) };
+  return { k, vehicle: spec.id, theme, seed, attempt, boss, dropIn: true, segs, expectedLength: Math.round(total) };
 }

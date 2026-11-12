@@ -1,6 +1,6 @@
 // Physics for one stage + one vehicle. Pure planck (no DOM / three) so it also runs in Node for the bot tests.
 import * as planck from 'planck';
-import { GRAVITY, vehiclePhysics } from './vehicleClass.js';
+import { GRAVITY, FLOAT, vehiclePhysics } from './vehicleClass.js';
 
 const { World, Vec2, Box, Circle, Chain, Edge, WheelJoint, RevoluteJoint } = planck;
 const FRICTION = { grass: 0.9, boost: 1.0, spring: 0.9, ice: 0.05, mud: 1.1, rainbow: 1.0, shroom: 0.9, funk: 0.9, rumble: 1.0 };
@@ -30,7 +30,7 @@ export class Sim {
     this.events = []; this.time = 0; this.resets = 0; this.finished = false; this.finishTime = null;
     this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.throttle = 0; this.cpIndex = 0; this.hint = false;
     this.collect = stage.collectibles.map((c) => ({ ...c, got: false })); this.starsGot = 0; this.starsTotal = this.collect.length;
-    this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.loop = null; this.rumble = 0; this.props = []; this.maxX = 0;
+    this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.loop = null; this.rumble = 0; this.airT = 0; this.groundT = 0; this.trick = null; this.flips = 0; this.bestAir = 0; this.props = []; this.maxX = 0;
     this._buildTerrain(); this._buildProps(); this._buildCar(); this.reset(true);
   }
 
@@ -82,7 +82,7 @@ export class Sim {
     this.chassis.setMassData(md);
     this.wheels = vp.axles.map((a) => {
       const b = w.createBody({ type: 'dynamic', position: new Vec2(a.x, 5 + a.y) });
-      const f = b.createFixture(new Circle(a.r), { density: vp.density * 0.6, friction: vp.grip, restitution: 0.05 }); f.setUserData('wheel');
+      const f = b.createFixture(new Circle(a.r), { density: vp.density * 0.6, friction: vp.grip, restitution: 0.28 }); f.setUserData('wheel');
       const j = w.createJoint(new WheelJoint({ motorSpeed: 0, maxMotorTorque: 0, enableMotor: true, frequencyHz: vp.freq, dampingRatio: vp.damp }, this.chassis, b, b.getPosition(), new Vec2(0, 1)));
       return { body: b, joint: j, r: a.r, off: a };
     });
@@ -110,6 +110,7 @@ export class Sim {
       wh.body.setLinearVelocity(new Vec2(0, 0)); wh.body.setAngularVelocity(0);
     }
     if (this.loop) { this._setDynamic(); this.loop = null; }
+    this.trick = null; this.airT = 0;
     this.damage = 0; // a reset / respawn repairs the vehicle
     this.throttle = 0; this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.hint = false; this.dead = false;
     this.prevV = new Vec2(0, 0); this.maxX = p.x; this.grace = 0.5;
@@ -120,6 +121,46 @@ export class Sim {
   get y() { return this.chassis.getPosition().y; }
   get angle() { return this.chassis.getAngle(); }
   get speed() { return this.chassis.getLinearVelocity().x; }
+
+  // ---- automatic mid-air flips: purely visual rotation of the model, planned at take-off so it always finishes before landing ----
+  _predictLanding() {
+    const p = this.chassis.getPosition(), v = this.chassis.getLinearVelocity(), g = GRAVITY * (1 - FLOAT);
+    for (let t = 0.05; t < 4.5; t += 0.05) {
+      const x = p.x + v.x * t, y = p.y + v.y * t - 0.5 * g * t * t, gy = this.stage.groundY(x);
+      if (gy == null) { if (y < p.y - 6) return null; continue; } // over a pit: no trick
+      if (y - 1.0 <= gy) return t;
+    }
+    return 4.5;
+  }
+  trickAngle() {
+    const T = this.trick; if (!T) return 0;
+    const sm = (k) => k * k * (3 - 2 * k);
+    if (T.landed !== undefined) { const k = Math.min(1, (this.time - T.landed) / 0.15), base = T.angleAtLand, tgt = Math.round(base / (2 * Math.PI)) * 2 * Math.PI; if (k >= 1) { this.trick = null; return 0; } return (base + (tgt - base) * sm(k)) % (2 * Math.PI); }
+    return T.dir * 2 * Math.PI * T.flips * sm(Math.min(1, (this.time - T.t0) / T.dur));
+  }
+  _updateAir(dt, grounded) {
+    if (grounded > 0) this.groundT += dt; else this.groundT = 0;
+    const wasAir = this.airT;
+    if (grounded === 0) { this.airT += dt; } else if (this.airT > 0) {
+      // landing
+      if (this.airT > this.bestAir) this.bestAir = this.airT;
+      if (this.trick && this.trick.landed === undefined) {
+        const T = this.trick, prog = (this.time - T.t0) / T.dur; T.angleAtLand = this.trickAngle(); T.landed = this.time;
+        if (prog >= 0.8) { this.flips += T.flips; this.events.push({ type: 'flip', n: T.flips, total: this.flips, x: this.x, y: this.y }); }
+      }
+      if (this.airT > 1.6) this.events.push({ type: 'air', time: this.airT, x: this.x, y: this.y });
+      this.airT = 0;
+    }
+    // take-off: plan a flip if there is enough air time ahead
+    if (this.airT > 0.12 && wasAir <= 0.12 && !this.trick && this.groundT === 0) {
+      const tl = this._predictLanding();
+      if (tl && tl > 1.15) {
+        const flips = tl > 2.5 ? 2 : 1, dur = flips === 1 ? 0.85 : 1.5;
+        if (dur + 0.2 < tl) { this.trick = { t0: this.time, dur, flips, dir: Math.random() < 0.7 ? 1 : -1 }; this.events.push({ type: 'trick', flips, dir: this.trick.dir, x: this.x, y: this.y }); }
+      }
+    }
+    if (this.trick && this.trick.landed !== undefined && this.time - this.trick.landed > 0.2) this.trick = null;
+  }
 
   _collect(pos) { // stars + balloons: grabbed by the vehicle body or either wheel (generous radius, kids are small!)
     const reach = this.vp.chassis.hx * 0.7 + 0.9;
@@ -204,6 +245,9 @@ export class Sim {
       if (pad.type === 'mud') for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) { const v = b.getLinearVelocity(); b.setLinearVelocity(new Vec2(v.x * 0.985, v.y)); }
     }
 
+    // floaty: reduced gravity while airborne (everything stays in flight longer)
+    if (grounded === 0) for (const b of this._bodies()) b.applyForceToCenter(new Vec2(0, b.getMass() * GRAVITY * FLOAT));
+    this._updateAir(dt, grounded);
     for (const pr of this.props) if (pr.def.type === 'ferry') { // kinematic platform follows the ferry timetable
       const tx = ferryCenter(pr.def, this.time), cx = pr.body.getPosition().x;
       pr.body.setLinearVelocity(new Vec2((tx - cx) / dt, 0));

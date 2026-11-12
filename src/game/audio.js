@@ -63,6 +63,8 @@ export class GameAudio {
         else { this._tone(f, 0.18, { type: 'triangle', gain: 0.28 }); this._tone(f * 2, 0.22, { type: 'sine', gain: 0.13, when: 0.04 }); }
         break;
       }
+      case 'trick': this._tone(260, 0.55, { type: 'sine', gain: 0.16, slide: 900 }); this._noise(0.4, { lp: 6000, hp: 1500, gain: 0.12 }); break;
+      case 'flip': [523, 659, 784, 1046].forEach((f, i) => this._tone(f, 0.16, { type: 'square', gain: 0.12, when: i * 0.07 })); this._noise(0.5, { lp: 4000, hp: 500, gain: 0.2 }); break;
       case 'cheer': { const f = [520, 600, 700, 780, 900][e.pitch % 5]; this._tone(f, 0.1, { type: 'triangle', gain: 0.16, slide: 260 }); this._tone(f * 1.25, 0.12, { type: 'triangle', gain: 0.14, slide: 240, when: 0.1 }); break; }
       case 'loop': this._noise(1.4, { lp: 4000, hp: 400, gain: 0.35 }); this._tone(300, 1.5, { type: 'sawtooth', gain: 0.1, slide: 1400 }); break;
       case 'catapult': this._tone(150, 0.7, { type: 'sawtooth', gain: 0.22, slide: 1100 }); this._noise(0.6, { lp: 5000, hp: 600, gain: 0.35 }); this._tone(500, 0.3, { type: 'triangle', gain: 0.25, slide: 700, when: 0.05 }); break;
