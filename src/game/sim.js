@@ -29,7 +29,7 @@ export class Sim {
     this.world = new World({ gravity: new Vec2(0, -GRAVITY) });
     this.events = []; this.time = 0; this.resets = 0; this.finished = false; this.finishTime = null;
     this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.throttle = 0; this.cpIndex = 0; this.hint = false;
-    this.padState = new Map(); this.boostT = 0; this.props = []; this.maxX = 0;
+    this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.props = []; this.maxX = 0;
     this._buildTerrain(); this._buildProps(); this._buildCar(); this.reset(true);
   }
 
@@ -108,6 +108,7 @@ export class Sim {
       const o = wh.off; wh.body.setTransform(new Vec2(p.x + o.x * ca - o.y * sa, p.y + o.x * sa + o.y * ca), 0);
       wh.body.setLinearVelocity(new Vec2(0, 0)); wh.body.setAngularVelocity(0);
     }
+    this.damage = 0; // a reset / respawn repairs the vehicle
     this.throttle = 0; this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.hint = false; this.dead = false;
     this.prevV = new Vec2(0, 0); this.maxX = p.x; this.grace = 0.5;
     if (!initial) { this.resets++; this.events.push({ type: 'reset', x: p.x, y: p.y }); }
@@ -169,7 +170,11 @@ export class Sim {
 
     // events + state
     const v2 = this.chassis.getLinearVelocity(), dvx = v2.x - this.prevV.x, dvy = v2.y - this.prevV.y, dv = Math.hypot(dvx, dvy);
-    if (this.grace <= 0 && dv > 7) this.events.push({ type: 'bump', power: Math.min(1, dv / 22), x: pos.x, y: pos.y });
+    if (this.grace <= 0 && dv > 2.5 && this.time - this.lastHit > 0.15) {
+      // every knock adds damage in proportion to how hard it was: a soft landing ~3-6 %, a hard crash up to 35 % (cosmetic only)
+      const hit = Math.min(0.35, (dv - 2) / 45); this.damage = Math.min(1, this.damage + hit); this.lastHit = this.time;
+      this.events.push({ type: 'bump', power: Math.min(1, dv / 22), hit, damage: this.damage, dvx, dvy, x: pos.x, y: pos.y });
+    }
     this.prevV = new Vec2(v2.x, v2.y);
     this.maxX = Math.max(this.maxX, pos.x);
     while (this.cpIndex + 1 < this.stage.checkpoints.length && pos.x > this.stage.checkpoints[this.cpIndex + 1].x) { this.cpIndex++; this.events.push({ type: 'checkpoint', x: pos.x, y: pos.y }); }

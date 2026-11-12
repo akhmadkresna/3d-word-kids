@@ -209,6 +209,11 @@ export class GameView {
       const axle = Math.abs(zLocal - rear) <= Math.abs(zLocal - front) ? 0 : 1;
       this.wheelNodes.push({ obj: o, axle, rest: o.position.clone() });
     }
+    // damage visuals: private copies of the body materials (the cached model shares them), wheels spin then yaw
+    const wheelParts = new Set(); for (const wn of this.wheelNodes) { wn.obj.rotation.order = 'YXZ'; wn.obj.traverse((o) => wheelParts.add(o)); }
+    this.bodyMats = [];
+    model.traverse((o) => { if (o.isMesh && !wheelParts.has(o) && o.material && o.material.color) { o.material = o.material.clone(); this.bodyMats.push({ m: o.material, base: o.material.color.clone() }); } });
+    this.model = model; this.dmgApplied = -1; this.emitAcc = 0; this.fireAcc = 0;
     this.carOuter = outer; this.dirSign = dir;
   }
 
@@ -218,11 +223,38 @@ export class GameView {
     const before = new Set(this.scene.children);
     this.splashes = Array.from({ length: 3 }, () => ({ fn: createSplash(this.scene), t0: -99, o: new THREE.Vector3(), y: 0 }));
     this.smokes = Array.from({ length: 6 }, () => ({ fn: createSmoke(this.scene, { count: 8, seed: 3, size: 2, life: 0.9, speed: 3 }), t0: -99, o: new THREE.Vector3() }));
+    // damage smoke / fire trail and flying debris (pooled meshes, driven by time)
+    const puffGeo = new THREE.IcosahedronGeometry(1, 1), debGeo = new THREE.BoxGeometry(1, 1, 1);
+    this.puffs = Array.from({ length: 60 }, () => {
+      const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+      m.visible = false; m.userData.noShadow = true; this.scene.add(m);
+      return { m, t0: -99, life: 1, x: 0, y: 0, vx: 0, vy: 0, s0: 0.3, s1: 1.5, fire: false, d: 0 };
+    });
+    this.debris = Array.from({ length: 40 }, () => {
+      const m = new THREE.Mesh(debGeo, new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.7 }));
+      m.visible = false; m.userData.noShadow = true; this.scene.add(m);
+      return { m, t0: -99, life: 1.6, x: 0, y: 0, vx: 0, vy: 0, sx: 0, sy: 0, sz: 0, size: 0.2, rest: false };
+    });
+    this.pi = 0; this.di = 0;
     this.fxObjs.push({ root: this.scene.children.filter((c) => !before.has(c)) });
     this.si = 0; this.mi = 0;
   }
 
+  _puff(now, x, y, vx, vy, life, s0, s1, fire, d) {
+    const p = this.puffs[this.pi++ % this.puffs.length];
+    Object.assign(p, { t0: now, life, x, y, vx, vy, s0, s1, fire, d });
+  }
+  _debris(e, now) {
+    const n = Math.min(10, 2 + Math.floor(e.hit * 26)), palette = [0x2b2b2b, 0x6e6e6e, 0xbdbdbd, 0xff7043, 0xffd54a];
+    for (let i = 0; i < n; i++) {
+      const p = this.debris[this.di++ % this.debris.length], sz = 0.12 + Math.random() * (0.18 + e.hit);
+      p.m.material.color.setHex(palette[Math.floor(Math.random() * palette.length)]);
+      Object.assign(p, { t0: now, life: 1.7, x: e.x + (Math.random() - 0.5) * 1.5, y: e.y + 0.2, vx: -e.dvx * 0.25 + (Math.random() - 0.5) * 7, vy: 3 + Math.random() * (4 + e.hit * 14), sx: (Math.random() - 0.5) * 12, sy: (Math.random() - 0.5) * 12, sz: (Math.random() - 0.5) * 12, size: sz, rest: false });
+    }
+    for (let i = 0; i < 3 + Math.round(e.hit * 12); i++) this._puff(now, e.x + (Math.random() - 0.5) * 2, e.y + 0.3, (Math.random() - 0.5) * 5, 1 + Math.random() * 3, 0.9, 0.4, 1.8 + e.hit * 3, false, Math.max(0.3, e.damage));
+  }
   event(e, now) {
+    if (e.type === 'bump' && e.hit > 0.03) this._debris(e, now);
     if (e.type === 'splash') { const s = this.splashes[this.si++ % this.splashes.length]; s.t0 = now; s.o.set(e.x, e.y, 0); s.y = e.y; }
     else if (e.type === 'bump' && e.power > 0.35 || e.type === 'spring' || e.type === 'boost') { const s = this.smokes[this.mi++ % this.smokes.length]; s.t0 = now; s.o.set(e.x, e.y - 0.6, 0.5); }
     else if (e.type === 'finish') {
@@ -262,7 +294,46 @@ export class GameView {
     // effects
     for (const s2 of this.splashes) s2.fn(now - s2.t0, s2.o, s2.y);
     for (const s2 of this.smokes) s2.fn(now - s2.t0, s2.o);
+    this._damageFx(sim, now, dt, snap);
     if (this.confetti) { this.confetti.fn(now - this.confetti.t0); }
+  }
+
+  // body darkens/squashes, wheels wobble, smoke (then fire) trails the vehicle; all scale with sim.damage
+  _damageFx(sim, now, dt, snap) {
+    const d = sim.damage, s = this.modelScale ?? this.vp.scale;
+    if (Math.abs(d - this.dmgApplied) > 0.003) {
+      this.dmgApplied = d;
+      const soot = new THREE.Color(0x2d2926);
+      for (const b of this.bodyMats) b.m.color.copy(b.base).lerp(soot, Math.min(1, d * 0.85));
+      this.model.scale.set(s, s * (1 - 0.11 * d), s * (1 - 0.08 * d)); this.model.rotation.x = 0.07 * d; // crumpled + sagging
+    }
+    this.wheelNodes.forEach((wn, i) => { wn.obj.rotation.y = d > 0.05 ? Math.sin(now * 17 + i * 2.1) * 0.22 * d * d + (i === 0 ? 0.55 * Math.max(0, d - 0.45) : 0) : 0; });
+    if (!sim.dead && d > 0.08) {
+      const a = snap.a, ca = Math.cos(a), sa = Math.sin(a), lx = this.vp.chassis.hx * 0.6, ly = this.vp.chassis.y1 * 0.9;
+      const hx = snap.x + lx * ca - ly * sa, hy = snap.y + lx * sa + ly * ca;
+      this.emitAcc += dt * (3 + 30 * d);
+      while (this.emitAcc >= 1) { this.emitAcc -= 1; this._puff(now, hx + (Math.random() - 0.5) * 0.5, hy, -sim.speed * 0.12 + (Math.random() - 0.5) * 1.2, 1.4 + Math.random() * 1.6, 0.9 + d * 0.8, 0.25, 1.2 + d * 1.6, false, d); }
+      if (d > 0.62) { this.fireAcc += dt * (10 + 30 * (d - 0.62)); while (this.fireAcc >= 1) { this.fireAcc -= 1; this._puff(now, hx + (Math.random() - 0.5) * 0.6, hy - 0.1, -sim.speed * 0.05 + (Math.random() - 0.5), 2.2 + Math.random(), 0.35, 0.35, 0.1, true, d); } }
+    }
+    const smokeLight = new THREE.Color(0xe8e8e8), smokeDark = new THREE.Color(0x1b1b1b), fireA = new THREE.Color(0xffd54a), fireB = new THREE.Color(0xff4d00);
+    for (const p of this.puffs) {
+      const age = now - p.t0;
+      if (age < 0 || age > p.life) { p.m.visible = false; continue; }
+      const k = age / p.life;
+      p.m.visible = true; p.m.position.set(p.x + p.vx * age, p.y + p.vy * age + 0.4 * age * age, 0.5);
+      p.m.scale.setScalar(p.s0 + (p.s1 - p.s0) * k);
+      if (p.fire) { p.m.material.color.copy(fireA).lerp(fireB, k); p.m.material.opacity = 0.95 * (1 - k); }
+      else { p.m.material.color.copy(smokeLight).lerp(smokeDark, Math.min(1, p.d * 1.25)); p.m.material.opacity = 0.6 * (1 - k) ** 1.2 * (0.55 + p.d * 0.45); }
+    }
+    for (const p of this.debris) {
+      const age = now - p.t0;
+      if (age < 0 || age > p.life) { p.m.visible = false; continue; }
+      const t = p.rest ? p.restAge : age; let y = p.y + p.vy * t - 11 * t * t;
+      const gy = this.stage.groundY(p.x + p.vx * t);
+      if (gy != null && y < gy + p.size * 0.5) { y = gy + p.size * 0.5; if (!p.rest) { p.rest = true; p.restAge = age; p.rx = p.x + p.vx * age; p.ry = y; } }
+      p.m.visible = true; p.m.position.set(p.rest ? p.rx : p.x + p.vx * t, p.rest ? p.ry : y, 0.3);
+      p.m.rotation.set(p.sx * t, p.sy * t, p.sz * t); p.m.scale.setScalar(p.size * Math.min(1, (p.life - age) / 0.4));
+    }
   }
 
   _bindProps(sim) {

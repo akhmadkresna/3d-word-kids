@@ -12,6 +12,11 @@ Built to play with kids — and to record: one video can cover many stages (the 
 Extras: the **☰ Stages** button (or `Esc`) opens the stage picker (any stage, restart, music on/off). **🎲** jumps to a random stage, and the menu can switch auto-advance between *in order* and *random* (handy for recording). Direct link to a stage: `…/#37`.
 Finish a stage → ★ rating by time (par is based on a test bot) → next stage starts automatically (or press GAS).
 
+## Damage
+Every knock adds damage in proportion to how hard it was (soft landing ≈ 3–6 %, hard crash up to 35 %). The meter under the stage name shows it, and the vehicle shows it:
+smoke that gets thicker and darker, fire above ~60 %, a sooty crumpled body, a wobbly wheel, debris flying off, and a sputtering engine. It is cosmetic only (stages stay solvable).
+**RESET** (or falling in water) repairs the vehicle.
+
 ## Recording mode (random stages + random cars)
 Menu (☰ Stages) → **🎬 Recording mode**, or open the game with **`?rec=1`** (e.g. `…/3d-word-kids/?rec=1&diff=hard`; `diff` = `easy` / `mixed` / `hard`).
 Endless: after each stage a brand-new one starts, with a random vehicle, theme, difficulty and obstacle mix — generated and bot-checked in a background worker one stage ahead, so there is no waiting.

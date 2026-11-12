@@ -93,7 +93,7 @@ async function startDef(def) {
   try { await view.loadStage(stage, spec, vp); } catch (e) { console.error(e); $('loading').textContent = 'Could not load: ' + e.message; return; }
   if (token !== loadToken) return;
   for (let i = 0; i < 30; i++) sim.step(false); // let the suspension settle
-  sim.events.length = 0; sim.time = 0;
+  sim.events.length = 0; sim.time = 0; sim.damage = 0;
   if (!recMode) { normalK = k; location.hash = String(k); try { localStorage.setItem(SAVE + '-last', String(k)); } catch {} }
   $('stageNum').textContent = recMode ? `🎬 Mix · level ${k}` : `Stage ${k}`; $('vehName').textContent = spec.name; hintShown = false;
   $('timeBest').textContent = !recMode && save.best[k] ? `Best ${fmt(save.best[k])}` : `Par ${fmt(def.par)}`;
@@ -160,7 +160,8 @@ function frame(tms) {
     }
     if (acc > DT * 6) acc = 0;
     view.update(sim, now, dt);
-    audio.engine(sim.throttle, sim.speed, !sim.dead);
+    audio.engine(sim.throttle, sim.speed, !sim.dead, sim.damage);
+    $('dmgFill').style.width = `${Math.round(sim.damage * 100)}%`; $('dmgFill').style.background = `hsl(${Math.round(120 - 120 * sim.damage)},80%,55%)`;
 
     const def = curDef, prog = Math.max(0, Math.min(1, sim.x / stage.finishX));
     $('progFill').style.width = `${prog * 100}%`; $('progCar').style.left = `${prog * 100}%`;

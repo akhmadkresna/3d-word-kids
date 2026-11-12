@@ -12,19 +12,23 @@
   html, body { margin: 0; height: 100%; overflow: hidden; background: #8ec9ff; font-family: var(--font); }
   #game { position: fixed; inset: 0; }
   #game canvas { display: block; width: 100%; height: 100%; }
-  .panel { position: fixed; background: rgba(15,30,60,.55); color: #fff; border-radius: 16px; padding: 8px 14px; backdrop-filter: blur(4px); font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
-  #stageBox { top: 12px; left: 12px; font-size: clamp(14px, 2.6vw, 22px); }
+  #topbar { position: fixed; top: 10px; left: 10px; right: 10px; display: flex; align-items: center; gap: 8px; z-index: 5; pointer-events: none; }
+  #topbar > * { pointer-events: auto; flex: 0 0 auto; }
+  .panel { background: rgba(15,30,60,.55); color: #fff; border-radius: 16px; padding: 8px 14px; backdrop-filter: blur(4px); font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  #stageBox { font-size: clamp(13px, 2.4vw, 20px); min-width: 108px; }
+  .dmg { height: 5px; margin-top: 5px; background: rgba(255,255,255,.25); border-radius: 3px; overflow: hidden; }
+  .dmg i { display: block; height: 100%; width: 0; background: #69f0ae; transition: width .25s, background .25s; }
   #stageBox small { display: block; font-weight: 600; opacity: .85; font-size: .72em; }
-  #prog { top: 14px; left: 50%; transform: translateX(-50%); width: min(38vw, 420px); padding: 10px 14px; }
+  #prog { flex: 1 1 120px !important; max-width: 460px; min-width: 90px; margin: 0 auto; padding: 10px 14px; }
   #prog .bar { position: relative; height: 12px; background: rgba(255,255,255,.28); border-radius: 8px; }
   #prog .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg,#69f0ae,#ffeb3b); border-radius: 8px; }
   #prog .car { position: absolute; top: -9px; left: 0; font-size: 22px; transform: translateX(-50%); }
   #prog .flag { position: absolute; top: -12px; right: -8px; font-size: 24px; }
-  #time { top: 12px; right: 12px; font-size: clamp(14px, 2.6vw, 22px); text-align: right; }
+  #time { font-size: clamp(13px, 2.4vw, 20px); text-align: right; min-width: 78px; }
   #time small { display: block; opacity: .85; font-weight: 600; font-size: .72em; }
-  #tools { position: fixed; top: 72px; right: 12px; display: flex; gap: 8px; }
-  .iconbtn { height: 46px; min-width: 46px; padding: 0 14px; border-radius: 14px; border: 0; background: rgba(15,30,60,.6); color: #fff; font-family: var(--font); font-size: 20px; font-weight: 800; cursor: pointer; }
-  #menuBtn { background: #1e88e5; font-size: 17px; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+  #tools { display: flex; gap: 6px; }
+  .iconbtn { height: 42px; min-width: 42px; padding: 0 12px; border-radius: 14px; border: 0; background: rgba(15,30,60,.6); color: #fff; font-family: var(--font); font-size: 20px; font-weight: 800; cursor: pointer; }
+  #menuBtn { background: #1e88e5; font-size: 16px; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
   .big { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom)); border: 0; border-radius: 50%; width: clamp(110px, 22vmin, 190px); height: clamp(110px, 22vmin, 190px); color: #fff; font-family: var(--font); font-weight: 900; cursor: pointer; box-shadow: 0 8px 0 rgba(0,0,0,.28), 0 12px 24px rgba(0,0,0,.3); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: transform .05s, box-shadow .05s; }
   .big span.main { font-size: clamp(26px, 6vmin, 46px); letter-spacing: 1px; }
   .big span.hint { font-size: clamp(11px, 2.2vmin, 15px); opacity: .85; font-weight: 700; }
@@ -37,9 +41,8 @@
   #msg small { display: block; font-size: .42em; font-weight: 700; margin-top: 10px; opacity: .95; }
   .stars { font-size: 1.1em; letter-spacing: 6px; }
   #loading { position: fixed; inset: 0; background: linear-gradient(#5eb6ff,#c9ecff); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 34px; font-weight: 900; text-shadow: 0 3px 0 rgba(0,0,0,.25); z-index: 20; }
-  #recExit { display: none; position: fixed; top: 12px; right: 12px; height: 34px; min-width: 34px; border: 0; border-radius: 10px; background: rgba(15,30,60,.35); color: #fff; font-size: 16px; opacity: .45; cursor: pointer; z-index: 5; }
+  #recExit { display: none; height: 34px; min-width: 34px; border: 0; border-radius: 10px; background: rgba(15,30,60,.35); color: #fff; font-size: 16px; opacity: .45; cursor: pointer; }
   body.rec #recExit { display: block; } body.rec #tools { display: none; }
-  body.rec #time { right: 56px; }
   #menu { position: fixed; inset: 0; background: rgba(8,20,45,.82); z-index: 30; display: none; overflow: auto; padding: 18px; touch-action: pan-y; }
   #menu.open { display: block; }
   #menu h2 { color: #fff; margin: 4px 0 4px; font-size: 28px; }
@@ -57,13 +60,15 @@
 <body>
 <div id="game"></div>
 
-<div class="panel" id="stageBox"><span id="stageNum">Stage 1</span><small id="vehName"></small></div>
-<div class="panel" id="prog"><div class="bar"><div class="fill" id="progFill"></div><div class="car" id="progCar">🚗</div><div class="flag">🏁</div></div></div>
-<div class="panel" id="time"><span id="timeNow">0.0s</span><small id="timeBest"></small></div>
-<div id="tools"><button class="iconbtn" id="randBtn" title="Random stage">🎲</button><button class="iconbtn" id="muteBtn" title="Sound">🔊</button><button class="iconbtn" id="menuBtn" title="Choose a stage (Esc)">☰ Stages</button></div>
+<div id="topbar">
+  <div class="panel" id="stageBox"><span id="stageNum">Stage 1</span><small id="vehName"></small><div class="dmg" title="Damage"><i id="dmgFill"></i></div></div>
+  <div class="panel" id="prog"><div class="bar"><div class="fill" id="progFill"></div><div class="car" id="progCar">🚗</div><div class="flag">🏁</div></div></div>
+  <div class="panel" id="time"><span id="timeNow">0.0s</span><small id="timeBest"></small></div>
+  <div id="tools"><button class="iconbtn" id="randBtn" title="Random stage">🎲</button><button class="iconbtn" id="muteBtn" title="Sound">🔊</button><button class="iconbtn" id="menuBtn" title="Choose a stage (Esc)">☰ Stages</button></div>
+  <button id="recExit" title="Stop recording mode">⏹</button>
+</div>
 
 <div id="msg"></div>
-<button id="recExit" title="Stop recording mode">⏹</button>
 
 <button class="big" id="reset"><span class="main">↺</span><span class="hint">RESET · R</span></button>
 <button class="big" id="gas"><span class="main">GAS</span><span class="hint">hold · SPACE</span></button>

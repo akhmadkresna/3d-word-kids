@@ -21,12 +21,13 @@ export class GameAudio {
   setMuted(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.8; }
   setMusic(on) { this.musicOn = on; if (this.musBus) this.musBus.gain.value = on ? 0.16 : 0; }
 
-  engine(throttle, speed, alive) {
+  engine(throttle, speed, alive, damage = 0) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime, f = 55 + Math.min(1, Math.abs(speed) / 22) * 120 + throttle * 25;
     this.eng.o1.frequency.setTargetAtTime(f, t, 0.05); this.eng.o2.frequency.setTargetAtTime(f * 0.5, t, 0.05);
     this.eng.f.frequency.setTargetAtTime(350 + throttle * 700 + Math.abs(speed) * 20, t, 0.08);
-    this.eng.g.gain.setTargetAtTime(alive ? 0.05 + throttle * 0.09 : 0, t, 0.08);
+    this.eng.o1.detune.setTargetAtTime((Math.random() - 0.5) * damage * 500, t, 0.03); // rough, sputtering engine when damaged
+    this.eng.g.gain.setTargetAtTime(alive ? (0.05 + throttle * 0.09) * (1 - damage * 0.35 * Math.random()) : 0, t, 0.05);
   }
 
   _noise(dur, { lp = 3000, hp = 0, gain = 0.5, decay = 6, when = 0 } = {}) {
@@ -45,7 +46,8 @@ export class GameAudio {
   play(e) {
     if (!this.ctx) return;
     switch (e.type) {
-      case 'bump': this._noise(0.25, { lp: 900, gain: 0.25 + e.power * 0.7, decay: 8 }); this._tone(110 - e.power * 40, 0.2, { gain: 0.3 * e.power + 0.1, slide: -50 }); break;
+      case 'bump': if (e.power < 0.15) break; this._noise(0.25, { lp: 900, gain: 0.25 + e.power * 0.7, decay: 8 }); this._tone(110 - e.power * 40, 0.2, { gain: 0.3 * e.power + 0.1, slide: -50 });
+        if (e.hit > 0.03) { this._noise(0.18, { lp: 6000, hp: 1500, gain: 0.3 + e.hit * 1.2 }); this._tone(260 + Math.random() * 240, 0.16, { type: 'square', gain: 0.05 + e.hit * 0.5, slide: -120 }); } break;
       case 'splash': this._noise(1.0, { lp: 2500, hp: 400, gain: 0.8 }); this._tone(300, 0.4, { gain: 0.3, slide: -180 }); [0.5, 0.7, 0.9].forEach((w, i) => this._tone(330 + i * 70, 0.12, { gain: 0.2, slide: 300, when: w })); break;
       case 'boost': this._noise(0.6, { lp: 6000, hp: 1200, gain: 0.35 }); this._tone(300, 0.4, { type: 'sawtooth', gain: 0.12, slide: 500 }); break;
       case 'spring': this._tone(180, 0.35, { type: 'triangle', gain: 0.4, slide: 700 }); break;
