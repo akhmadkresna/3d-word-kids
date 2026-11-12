@@ -3,7 +3,7 @@ import * as planck from 'planck';
 import { GRAVITY, vehiclePhysics } from './vehicleClass.js';
 
 const { World, Vec2, Box, Circle, Chain, Edge, WheelJoint, RevoluteJoint } = planck;
-const FRICTION = { grass: 0.9, boost: 1.0, spring: 0.9, ice: 0.05, mud: 1.1, rainbow: 1.0, shroom: 0.9 };
+const FRICTION = { grass: 0.9, boost: 1.0, spring: 0.9, ice: 0.05, mud: 1.1, rainbow: 1.0, shroom: 0.9, funk: 0.9, rumble: 1.0 };
 export const DT = 1 / 60;
 
 // Ferry platform: docks at the near lip, travels across, docks at the far lip, returns (12 s cycle).
@@ -30,7 +30,7 @@ export class Sim {
     this.events = []; this.time = 0; this.resets = 0; this.finished = false; this.finishTime = null;
     this.deadTimer = 0; this.flipTimer = 0; this.stuckTimer = 0; this.throttle = 0; this.cpIndex = 0; this.hint = false;
     this.collect = stage.collectibles.map((c) => ({ ...c, got: false })); this.starsGot = 0; this.starsTotal = this.collect.length;
-    this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.loop = null; this.props = []; this.maxX = 0;
+    this.padState = new Map(); this.boostT = 0; this.damage = 0; this.lastHit = -9; this.loop = null; this.rumble = 0; this.props = []; this.maxX = 0;
     this._buildTerrain(); this._buildProps(); this._buildCar(); this.reset(true);
   }
 
@@ -193,13 +193,14 @@ export class Sim {
 
     // pads
     for (const pad of this.stage.pads) {
-      const inPad = this.wheels.some((wh) => { const p = wh.body.getPosition(); return p.x >= pad.x0 && p.x <= pad.x1 && p.y < pad.y + (pad.type === 'shroom' ? 3.8 : 2.5); });
+      const inPad = this.wheels.some((wh) => { const p = wh.body.getPosition(); return p.x >= pad.x0 && p.x <= pad.x1 && p.y < pad.y + (pad.type === 'shroom' || pad.type === 'catapult' ? 3.8 : 2.5); });
       const was = this.padState.get(pad) || false; this.padState.set(pad, inPad);
       if (!inPad) continue;
       if (pad.type === 'boost' && wantGas) { this.boostT = 1.1; this.chassis.applyForceToCenter(new Vec2(Math.cos(ang) * this.mass * 22, Math.sin(ang) * this.mass * 22)); if (!was) this.events.push({ type: 'boost', x: pos.x, y: pos.y }); }
       else if (pad.type === 'boost' && !was) this.events.push({ type: 'boost', x: pos.x, y: pos.y });
       if (pad.type === 'spring' && !was) { for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.05, Math.max(b.getLinearVelocity().y, 0) + 17)); this.events.push({ type: 'spring', x: pos.x, y: pos.y }); }
       if (pad.type === 'shroom' && !was) { for (const b of this._bodies()) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.04, Math.max(b.getLinearVelocity().y, 0) + 20)); this.events.push({ type: 'shroom', x: pos.x, y: pos.y }); }
+      if (pad.type === 'catapult' && !was) { for (const b of this._bodies()) b.setLinearVelocity(new Vec2(b.getLinearVelocity().x * 1.08, Math.max(b.getLinearVelocity().y, 0) + 12.5)); this.events.push({ type: 'catapult', x: pos.x, y: pos.y }); }
       if (pad.type === 'mud') for (const b of [this.chassis, ...this.wheels.map((w) => w.body)]) { const v = b.getLinearVelocity(); b.setLinearVelocity(new Vec2(v.x * 0.985, v.y)); }
     }
 
@@ -211,7 +212,7 @@ export class Sim {
 
     // events + state
     const v2 = this.chassis.getLinearVelocity(), dvx = v2.x - this.prevV.x, dvy = v2.y - this.prevV.y, dv = Math.hypot(dvx, dvy);
-    if (this.grace <= 0 && dv > 2.5 && this.time - this.lastHit > 0.15) {
+    if (this.grace <= 0 && dv > 2.5 && this.time - this.lastHit > 0.15 && !(this.rumble > 0.25 && dv < 6)) { // (a rumble-strip rattle is not damage)
       // every knock adds damage in proportion to how hard it was: a soft landing ~3-6 %, a hard crash up to 35 % (cosmetic only)
       const hit = Math.min(0.35, (dv - 2) / 45); this.damage = Math.min(1, this.damage + hit); this.lastHit = this.time;
       this.events.push({ type: 'bump', power: Math.min(1, dv / 22), hit, damage: this.damage, dvx, dvy, x: pos.x, y: pos.y });
@@ -221,6 +222,8 @@ export class Sim {
     }
     this.prevV = new Vec2(v2.x, v2.y);
     this.maxX = Math.max(this.maxX, pos.x);
+    const onRumble = this.stage.rumbles.some((r) => pos.x > r.x0 - 1 && pos.x < r.x1 + 1) && this.grounded() > 0;
+    this.rumble += ((onRumble ? Math.min(1, Math.abs(v2.x) / 16) : 0) - this.rumble) * Math.min(1, dt * 8);
     this._collect(pos);
     while (this.cpIndex + 1 < this.stage.checkpoints.length && pos.x > this.stage.checkpoints[this.cpIndex + 1].x) { this.cpIndex++; this.events.push({ type: 'checkpoint', x: pos.x, y: pos.y }); }
     if (!this.finished && pos.x >= this.stage.finishX) { this.finished = true; this.finishTime = this.time; this.events.push({ type: 'finish', time: this.time, x: pos.x, y: pos.y }); }

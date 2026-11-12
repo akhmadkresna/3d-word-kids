@@ -161,7 +161,7 @@ function frame(tms) {
     }
     if (acc > DT * 6) acc = 0;
     view.update(sim, now, dt);
-    audio.engine(sim.throttle, sim.speed, !sim.dead, sim.damage);
+    audio.engine(sim.throttle, sim.speed, !sim.dead, sim.damage); audio.rumble(sim.rumble || 0);
     $('starNow').textContent = sim.starsGot; $('starTot').textContent = sim.starsTotal;
     $('dmgFill').style.width = `${Math.round(sim.damage * 100)}%`; $('dmgFill').style.background = `hsl(${Math.round(120 - 120 * sim.damage)},80%,55%)`;
 

@@ -8,7 +8,7 @@ const STEP = 0.8;
 
 export function buildStage(def) {
   const rng = mulberry32(def.seed || 1);
-  const S = { def, pieces: [], walls: [], props: [], pads: [], pits: [], blocks: [], checkpoints: [], loops: [], tunnels: [] };
+  const S = { def, pieces: [], walls: [], props: [], pads: [], pits: [], blocks: [], checkpoints: [], loops: [], tunnels: [], rumbles: [] };
   let x = 0, y = 0, cur = { surface: 'grass', pts: [[0, 0]] }, lastCp = -999;
   // collectibles: stars + balloons. Line/balloon requests are resolved once the ground height is known.
   S.collectibles = []; const lineReqs = [], balloonReqs = [], crng = mulberry32((def.seed || 1) + 4242);
@@ -71,11 +71,13 @@ export function buildStage(def) {
       S.props.push({ type: 'ferry', x0: r.lipX, x1: r.landX, y: r.lipY, len: s.len });
       flat(14);
     },
-    loop: (s) => { // boost pad -> scripted vertical loop (the vehicle rides the ring), then flat ground
-      flat(s.runup); S.pads.push({ type: 'boost', x0: x, x1: x + 12, y }); flat(12, 'boost'); flat(5);
-      const l = { x0: x, y, R: s.R }; S.loops.push(l);
-      for (let i = 0; i < 8; i++) { const a = -Math.PI / 2 + ((i + 0.5) / 8) * Math.PI * 2; addStar(l.x0 + (s.R - 1.4) * Math.cos(a), y + s.R + (s.R - 1.4) * Math.sin(a)); }
-      flat(s.R + 12);
+    loop: (s) => { // boost pad -> scripted vertical loop(s) (n = 1 or 2 rings), then flat ground
+      for (let i = 0; i < (s.n || 1); i++) {
+        flat(i ? 6 : s.runup); S.pads.push({ type: 'boost', x0: x, x1: x + 12, y }); flat(12, 'boost'); flat(5);
+        const l = { x0: x, y, R: s.R }; S.loops.push(l);
+        for (let j = 0; j < 8; j++) { const a = -Math.PI / 2 + ((j + 0.5) / 8) * Math.PI * 2; addStar(l.x0 + (s.R - 1.4) * Math.cos(a), y + s.R + (s.R - 1.4) * Math.sin(a)); }
+        flat(i < (s.n || 1) - 1 ? s.R + 6 : s.R + 12);
+      }
     },
     rainbow: (s) => { // floating rainbow bridge: no ground under it
       flat(6); piece('rainbow'); profile(s.up, (t) => s.h * sm(t)); flat(s.top); profile(s.up, (t) => -s.h * sm(t)); piece('grass'); flat(4);
@@ -92,6 +94,30 @@ export function buildStage(def) {
         if (i < s.n - 1) starArc(x, y0, x + s.gap, y0, 7.5, 4);
       }
       flat(10);
+    },
+    funk: (s) => { // funky bumps: random shapes (round, spike, camel, plateau) in psychedelic colours
+      piece('funk');
+      for (let i = 0; i < s.n; i++) {
+        const w = s.w[i], h = s.h[i], k = s.shapes[i];
+        if (k === 0) profile(w, (t) => h * Math.sin(Math.PI * t));
+        else if (k === 1) profile(w, (t) => h * (t < 0.5 ? t * 2 : (1 - t) * 2));
+        else if (k === 2) profile(w, (t) => h * Math.pow(Math.abs(Math.sin(2 * Math.PI * t)), 0.8));
+        else profile(w, (t) => h * (sm(Math.min(1, t * 4)) - sm(Math.min(1, Math.max(0, (t - 0.75) * 4)))));
+        profile(s.gap[i], () => 0);
+      }
+      piece('grass'); flat(3);
+    },
+    washboard: (s) => { // rumble strip: many small close bumps that shake the vehicle
+      flat(3); const x0 = x; piece('rumble');
+      for (let i = 0; i < s.n; i++) profile(s.wl, (t) => s.h * (0.5 - 0.5 * Math.cos(2 * Math.PI * t)));
+      piece('grass'); S.rumbles.push({ x0, x1: x }); flat(4);
+    },
+    whoops: (s) => { // back-to-back humps: airtime every time
+      flat(3); piece('funk'); for (let i = 0; i < s.n; i++) profile(s.w, (t) => s.h * Math.sin(Math.PI * t)); piece('grass'); flat(4);
+    },
+    launcher: (s) => { // a bump with a catapult in it: it launches you high into the air
+      flat(2); const x0 = x, y0 = y; piece('funk'); profile(s.w, (t) => s.h * Math.sin(Math.PI * t)); piece('grass');
+      S.pads.push({ type: 'catapult', x0, x1: x, y: y0 }); starArc(x0 + 2, y0 + 1, x0 + 2 + s.far, y0 + 1, 7, 6); flat(8);
     },
     drop: (s) => { // sudden cliff down, then climb back up
       flat(s.len); push(x, y - s.h); flat(6); profile(s.h * 4.5, (t) => s.h * 0.9 * sm(t)); flat(4);

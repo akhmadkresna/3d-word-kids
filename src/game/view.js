@@ -117,6 +117,13 @@ export class GameView {
         const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(0.25, 0.25); t.colorSpace = THREE.SRGBColorSpace;
         return (mats[s] = std(0xffffff, { map: t }));
       }
+      if (s === 'funk' || s === 'rumble') { // psychedelic zig-zag stripes / yellow-black rumble strip (UVs are world coordinates)
+        const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+        if (s === 'funk') { const cols = ['#ff4081', '#ffd600', '#00e5ff', '#76ff03', '#b388ff']; for (let i = -4; i < 12; i++) { g.fillStyle = cols[((i % 5) + 5) % 5]; g.beginPath(); g.moveTo(i * 16, 0); g.lineTo(i * 16 + 16, 0); g.lineTo(i * 16 + 80, 128); g.lineTo(i * 16 + 64, 128); g.fill(); } }
+        else { g.fillStyle = '#ffcc00'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#222'; for (let i = 0; i < 4; i++) g.fillRect(i * 32 + 16, 0, 16, 128); }
+        const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(s === 'funk' ? 1 / 6 : 1 / 1.8, s === 'funk' ? 1 / 6 : 1); t.colorSpace = THREE.SRGBColorSpace;
+        return (mats[s] = std(0xffffff, { map: t, emissive: s === 'funk' ? 0x331133 : 0x000000 }));
+      }
       return (mats[s] = std(SURFACE[s] ?? style.grass));
     };
     const ribbon = (pts, d0, d1, mat, depth) => { // thin extruded strip between (y-d0) and (y-d1)
@@ -372,13 +379,14 @@ export class GameView {
   event(e, now) {
     if (e.type === 'bump' && e.hit > 0.03) this._debris(e, now);
     if (e.type === 'loop') for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; this._puff(now, e.x + Math.cos(a) * 5.5, e.y + Math.sin(a) * 5.5, Math.cos(a) * 2, Math.sin(a) * 2, 0.9, 0.3, 0.9, false, 0, [0xff5252, 0xffffff, 0xffeb3b, 0x40c4ff][i % 4]); }
+    if (e.type === 'catapult') for (let i = 0; i < 12; i++) { const a = Math.PI * (0.1 + 0.8 * (i / 11)); this._puff(now, e.x, e.y, Math.cos(a) * 6, Math.sin(a) * 6, 0.8, 0.25, 1.0, false, 0, [0xff4081, 0xffd600, 0x00e5ff, 0x76ff03][i % 4]); }
     if (e.type === 'shroom') for (let i = 0; i < 10; i++) { const a = Math.PI * (0.15 + 0.7 * (i / 9)); this._puff(now, e.x, e.y, Math.cos(a) * 5, Math.sin(a) * 5, 0.8, 0.25, 0.9, false, 0, i % 2 ? 0xffffff : 0xff5a5a); }
     if (e.type === 'collect') { // sparkle burst
       const cols = e.kind === 'balloon' ? [0xff4081, 0xffeb3b, 0x40c4ff, 0x69f0ae] : [0xffe066, 0xfff3a0, 0xffc400];
       for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2 + Math.random(); this._puff(now, e.x, e.y, Math.cos(a) * (2 + Math.random() * 3), Math.sin(a) * (2 + Math.random() * 3), 0.5, 0.18, 0.5, false, 0, cols[i % cols.length]); }
     }
     if (e.type === 'splash') { const s = this.splashes[this.si++ % this.splashes.length]; s.t0 = now; s.o.set(e.x, e.y, 0); s.y = e.y; }
-    else if (e.type === 'bump' && e.power > 0.35 || e.type === 'spring' || e.type === 'boost') { const s = this.smokes[this.mi++ % this.smokes.length]; s.t0 = now; s.o.set(e.x, e.y - 0.6, 0.5); }
+    else if (e.type === 'bump' && e.power > 0.35 || e.type === 'spring' || e.type === 'boost' || e.type === 'catapult') { const s = this.smokes[this.mi++ % this.smokes.length]; s.t0 = now; s.o.set(e.x, e.y - 0.6, 0.5); }
     else if (e.type === 'finish') {
       if (this.confetti) this.scene.remove(this.confetti.mesh);
       this.confetti = { t0: now, fn: createConfetti(this.scene, { count: 260, center: [e.x + 8, e.y, 0], spread: [12, 0, 4], yRange: [6, 12], fall: 3.2, floorY: e.y - 1 }) };
@@ -389,7 +397,8 @@ export class GameView {
   update(sim, now, dt) {
     const snap = sim.snapshot(), car = this.carOuter;
     // vehicle + wheels
-    car.position.set(snap.x, snap.y, 0); car.rotation.z = snap.a;
+    const rj = sim.rumble || 0; // washboard: the vehicle rattles
+    car.position.set(snap.x, snap.y + Math.sin(now * 91) * 0.04 * rj, 0); car.rotation.z = snap.a + Math.sin(now * 77) * 0.012 * rj;
     const ca = Math.cos(-snap.a), sa = Math.sin(-snap.a), s = this.vp.scale;
     for (const wn of this.wheelNodes) {
       const w = snap.wheels[wn.axle], dx = w.x - snap.x, dy = w.y - snap.y;
@@ -405,7 +414,7 @@ export class GameView {
       this.cam.x += (tx - this.cam.x) * k; this.cam.y += (ty - this.cam.y) * (1 - Math.exp(-dt * 2.2));
     }
     this.cam.d += (td - this.cam.d) * (1 - Math.exp(-dt * 1.5));
-    const shake = this.shake > 0 ? (this.shake -= dt, Math.sin(now * 90) * this.shake * 0.6) : 0;
+    const rum = sim.rumble || 0, shake = (this.shake > 0 ? (this.shake -= dt, Math.sin(now * 90) * this.shake * 0.6) : 0) + Math.sin(now * 63) * 0.11 * rum;
     this.camera.position.set(this.cam.x, this.cam.y + 0.9 + shake, this.cam.d);
     this.camera.lookAt(this.cam.x - 1, this.cam.y - 0.3, 0);
     // follow-parallax for sky layers, light follows the car

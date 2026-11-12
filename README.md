@@ -23,6 +23,12 @@ Also: tall **ski jumps** into cliff landings, **roller-coaster hills** for airti
 - **Rainbow bridge:** a glowing rainbow road floating in the sky. **Tunnel:** the world goes dark, neon lights and headlights come on. **Bouncy mushrooms:** big red polka-dot domes that launch you sky-high. The **candy** world has giant lollipops.
 Every stage has a ramp jump, a high climb, one showpiece (loop / rainbow / tunnel / mushrooms) and one classic obstacle, plus stars and balloons.
 
+## Bumps that fly and shake
+- **Launcher bump** – a pink-rainbow hump with a catapult inside: it fires you ~14 m into the air, with a star arc to follow.
+- **Whoops** – back-to-back humps, airtime every time. **Funky bumps** – random shapes (round, spike, camel, plateau) in psychedelic stripes.
+- **Washboard** – a yellow/black rumble strip of many small bumps: the vehicle, camera and a "brrrr" sound all rattle (more at higher speed).
+- **Double loops** appear in later stages.
+
 ## Damage
 Every knock adds damage in proportion to how hard it was (soft landing ≈ 3–6 %, hard crash up to 35 %). The meter under the stage name shows it, and the vehicle shows it:
 smoke that gets thicker and darker, fire above ~60 %, a sooty crumpled body, a wobbly wheel, debris flying off, and a sputtering engine. It is cosmetic only (stages stay solvable).

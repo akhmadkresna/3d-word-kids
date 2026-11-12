@@ -15,8 +15,13 @@ export class GameAudio {
     this.eng.o1.type = 'sawtooth'; this.eng.o2.type = 'square'; this.eng.f.type = 'lowpass'; this.eng.f.frequency.value = 500; this.eng.g.gain.value = 0;
     this.eng.o1.connect(this.eng.f); this.eng.o2.connect(this.eng.f); this.eng.f.connect(this.eng.g); this.eng.g.connect(this.sfxBus);
     this.eng.o1.start(); this.eng.o2.start();
+    // rumble strip rattle: looped noise, low-passed, chopped by a fast LFO
+    const rs = ctx.createBufferSource(); rs.buffer = this.noiseBuf; rs.loop = true; const rf = ctx.createBiquadFilter(); rf.type = 'lowpass'; rf.frequency.value = 650;
+    const trem = ctx.createGain(); trem.gain.value = 0.55; const lfo = ctx.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 24; const lg = ctx.createGain(); lg.gain.value = 0.45; lfo.connect(lg); lg.connect(trem.gain);
+    this.rumbleG = ctx.createGain(); this.rumbleG.gain.value = 0; rs.connect(rf); rf.connect(trem); trem.connect(this.rumbleG); this.rumbleG.connect(this.sfxBus); rs.start(); lfo.start();
     this._startMusic();
   }
+  rumble(level) { if (this.ctx) this.rumbleG.gain.setTargetAtTime(level * 0.3, this.ctx.currentTime, 0.06); }
 
   setMuted(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.8; }
   setMusic(on) { this.musicOn = on; if (this.musBus) this.musBus.gain.value = on ? 0.16 : 0; }
@@ -60,6 +65,7 @@ export class GameAudio {
       }
       case 'cheer': { const f = [520, 600, 700, 780, 900][e.pitch % 5]; this._tone(f, 0.1, { type: 'triangle', gain: 0.16, slide: 260 }); this._tone(f * 1.25, 0.12, { type: 'triangle', gain: 0.14, slide: 240, when: 0.1 }); break; }
       case 'loop': this._noise(1.4, { lp: 4000, hp: 400, gain: 0.35 }); this._tone(300, 1.5, { type: 'sawtooth', gain: 0.1, slide: 1400 }); break;
+      case 'catapult': this._tone(150, 0.7, { type: 'sawtooth', gain: 0.22, slide: 1100 }); this._noise(0.6, { lp: 5000, hp: 600, gain: 0.35 }); this._tone(500, 0.3, { type: 'triangle', gain: 0.25, slide: 700, when: 0.05 }); break;
       case 'shroom': this._tone(180, 0.5, { type: 'triangle', gain: 0.45, slide: 900 }); this._tone(400, 0.3, { type: 'sine', gain: 0.2, slide: 600, when: 0.05 }); break;
       case 'checkpoint': this._tone(880, 0.12, { gain: 0.25 }); this._tone(1320, 0.25, { gain: 0.25, when: 0.1 }); break;
       case 'reset': this._tone(500, 0.08, { gain: 0.25, type: 'square' }); this._tone(300, 0.1, { gain: 0.25, type: 'square', when: 0.08 }); break;
