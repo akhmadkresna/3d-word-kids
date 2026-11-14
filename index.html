@@ -67,6 +67,7 @@
   #menu { position: fixed; inset: 0; background: rgba(8,20,45,.9); z-index: 30; display: none; overflow-y: auto; overflow-x: hidden; padding: 0 18px 28px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
   #menu, #menu * { touch-action: pan-y; } /* the global 'touch-action: none' (needed for the game buttons) must not block scrolling in here */
   #menuHead { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -18px 10px; padding: 10px 18px; background: rgba(8,20,45,.97); }
+  #menu button:focus { outline: 4px solid #ffeb3b; outline-offset: 2px; }
   #menuHead h2 { margin: 0; }
   #menu.open { display: block; }
   #menu h2 { color: #fff; font-size: 26px; }
@@ -104,6 +105,7 @@
 
 <div id="menu">
   <div id="menuHead"><h2>Choose a stage</h2><button id="menuClose">✕ Close</button></div>
+  <p id="padHint" style="display:none;color:#9be7ff">🎮 Controller: D-pad / stick = move · <b>A</b> = select · <b>B</b> or <b>Start</b> = close</p>
   <p>100 stages · new vehicle & obstacles each time · stars for fast times</p>
   <div class="menurow"><button id="recBtn" class="bigrec">🎬 Recording mode — clean screen, random stages &amp; cars</button></div>
   <div class="menurow"><button id="recDiffBtn">Difficulty: mixed</button><button id="recBtnsBtn">Buttons while recording: faint</button></div>

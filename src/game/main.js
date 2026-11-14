@@ -21,7 +21,8 @@ let sim = null, stage = null, k = 1, state = 'loading', now = 0, gasKeys = 0, ga
 const params = new URLSearchParams(location.search), autoGas = params.has('autogas');
 
 // ---------- input: ONE gas button + ONE reset button ----------
-const gasHeld = () => autoGas || gasKeys > 0 || gasPtr;
+let padGas = false;
+const gasHeld = () => autoGas || gasKeys > 0 || gasPtr || padGas;
 const GAS_KEYS = new Set(['Space', 'ArrowUp', 'ArrowRight', 'KeyD', 'KeyW']), held = new Set();
 addEventListener('keydown', (e) => {
   audio.start();
@@ -69,6 +70,64 @@ function dbgUpdate(t) {
     `aspect ${cam.aspect.toFixed(2)}  standalone ${navigator.standalone === true || matchMedia('(display-mode: standalone)').matches}  fs ${!!document.fullscreenElement}`,
     p ? `car ${p.x.toFixed(1)},${p.y.toFixed(1)}  cam ${view.cam.x.toFixed(1)},${view.cam.y.toFixed(1)} d ${view.cam.d.toFixed(1)}  state ${state}  dead ${p.dead}` : 'no sim',
     `gl ${gl.isContextLost() ? 'LOST' : 'ok'} ${gpu}`, dbgErrors.length ? `errors(${dbgErrors.length}): ${dbgErrors.slice(-2).join(' | ')}` : 'errors: none'].join('\n');
+}
+
+// ---------- gamepad / joystick (Gamepad API: Xbox, PlayStation, generic USB/Bluetooth pads and joysticks) ----------
+// GAS: A / X / RB / LT / RT, or push the stick (or D-pad) forward. RESET: B / Y. Start = stage menu. Back/View = random stage.
+// In the menu: D-pad or stick moves, A selects, B / Start closes. The pad also rumbles on bumps, crashes, flips and boosts.
+let padActive = false, padNavAt = 0, lastRumble = 0; const padPrev = {};
+function activePad() { const l = navigator.getGamepads ? navigator.getGamepads() : []; for (const g of l) if (g && g.connected) return g; return null; }
+function setPadHints(on) {
+  padActive = on; $('gas').querySelector('.hint').textContent = on ? 'hold · A / RT' : 'hold · SPACE'; $('reset').querySelector('.hint').textContent = on ? 'RESET · B' : 'RESET · R';
+  $('padHint').style.display = on ? 'block' : 'none';
+}
+function rumble(strong, weak, ms) {
+  const g = activePad(), t = performance.now(); if (!g || !g.vibrationActuator || t - lastRumble < 70) return; lastRumble = t;
+  try { g.vibrationActuator.playEffect('dual-rumble', { startDelay: 0, duration: ms, weakMagnitude: Math.min(1, weak), strongMagnitude: Math.min(1, strong) }); } catch { /* not supported */ }
+}
+function menuNav(dir) { // spatial focus movement between the menu's buttons
+  const items = [...document.querySelectorAll('#menu button')].filter((b) => b.offsetParent !== null); if (!items.length) return;
+  const cur = items.includes(document.activeElement) ? document.activeElement : (document.querySelector('#grid button.cur') || items[0]);
+  if (cur !== document.activeElement) { cur.focus(); cur.scrollIntoView({ block: 'nearest' }); return; }
+  const r0 = cur.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2; let best = null, bs = 1e9;
+  for (const el of items) { if (el === cur) continue; const r = el.getBoundingClientRect(), dx = r.left + r.width / 2 - cx, dy = r.top + r.height / 2 - cy;
+    const along = dir === 'right' ? dx : dir === 'left' ? -dx : dir === 'down' ? dy : -dy, across = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx);
+    if (along < 6) continue; const sc = along + across * 2.2; if (sc < bs) { bs = sc; best = el; } }
+  if (best) { best.focus(); best.scrollIntoView({ block: 'nearest' }); }
+}
+function pollPad(t) {
+  const g = activePad();
+  if (!g) { if (padActive) setPadHints(false); padGas = false; return; }
+  if (!padActive) { setPadHints(true); toast(`🎮 Controller connected<br><b>A / RT / stick forward</b> = GAS · <b>B</b> = RESET · <b>Start</b> = Stages`, 6000); }
+  const std = g.mapping === 'standard', b = (i) => !!(g.buttons[i] && (g.buttons[i].pressed || g.buttons[i].value > 0.4)), ax = (i) => g.axes[i] || 0, DZ = 0.55;
+  const up = ax(1) < -DZ || (std && b(12)), down = ax(1) > DZ || (std && b(13)), left = ax(0) < -DZ || (std && b(14)), right = ax(0) > DZ || (std && b(15));
+  const gasBtn = b(0) || b(2) || b(5) || b(6) || b(7) || (!std && b(4)), resetBtn = b(1) || b(3), startBtn = b(9), backBtn = b(8);
+  const edge = (key, v) => { const r = v && !padPrev[key]; padPrev[key] = v; return r; };
+  if (edge('any', gasBtn || resetBtn || startBtn || backBtn || up || down || left || right)) audio.start();
+  if ($('menu').classList.contains('open')) { // menu: move with D-pad / stick, A = select, B / Start = close
+    padGas = false;
+    for (const [name, v] of [['up', up], ['down', down], ['left', left], ['right', right]]) { if (v && (t > padNavAt || !padPrev['n' + name])) { menuNav(name); padNavAt = t + (padPrev['n' + name] ? 160 : 320); } padPrev['n' + name] = v; }
+    if (edge('a', b(0))) { const f = document.activeElement; if (f && f.closest('#menu')) f.click(); }
+    if (edge('b', b(1)) || edge('start', startBtn)) toggleMenu(false);
+    return;
+  }
+  for (const n of ['nup', 'ndown', 'nleft', 'nright']) padPrev[n] = false;
+  const wantGas = gasBtn || up;
+  if (wantGas && !padGas) { padGas = true; onGasPress(); } else if (!wantGas) padGas = false;
+  if (edge('reset', resetBtn)) doReset();
+  if (edge('start', startBtn)) { toggleMenu(true); setTimeout(() => menuNav('none'), 30); }
+  if (edge('back', backBtn)) randomStage();
+}
+window.addEventListener('gamepadconnected', () => { audio.start(); });
+setInterval(() => pollPad(performance.now()), 16); // its own timer: a button tap is never missed, even when drawing frames are slow
+function padEvent(e) { // rumble pattern per game event
+  switch (e.type) {
+    case 'bump': rumble(Math.min(1, e.power * 1.1), e.power * 0.7, 80 + e.power * 170); break;
+    case 'crash': rumble(1, 0.9, 520); break; case 'flip': rumble(0.3, 0.8, 200); break; case 'super': rumble(0.7, 0.7, 380); break;
+    case 'splash': rumble(0.5, 0.35, 320); break; case 'boost': rumble(0.25, 0.6, 220); break; case 'loop': rumble(0.3, 0.5, 320); break;
+    case 'spring': case 'shroom': case 'catapult': rumble(0.6, 0.4, 220); break; case 'finish': rumble(0.4, 0.8, 650); break;
+    case 'collect': rumble(0, 0.3, 45); break; case 'reset': rumble(0.3, 0.2, 90); break;
+  }
 }
 
 // ---------- full screen ----------
@@ -209,7 +268,7 @@ function frame(tms) {
       sim.step(state === 'playing' || state === 'finished' ? gasHeld() : false); view.capture(sim);
       acc -= DT; steps++;
       for (const e of sim.events) {
-        audio.play(e); view.event(e, now);
+        audio.play(e); view.event(e, now); padEvent(e);
         if (e.type === 'bump' && e.power > 0.5) view.shakeCamera(0.25 * e.power);
         if (e.type === 'finish') onFinish(e);
         if (e.type === 'flip') pop((e.n === 1 ? '🌀 BACKFLIP!' : e.n === 2 ? '🌀🌀 DOUBLE BACKFLIP!!' : e.n === 3 ? '🌀🌀🌀 TRIPLE FLIP!!!' : `🌀 MEGA FLIP x${e.n}!!!`) + (e.perfect ? ' ✨ PERFECT!' : ''));
@@ -221,7 +280,7 @@ function frame(tms) {
     }
     if (acc > DT * 6) acc = 0;
     view.update(sim, now, dt, params.has('nointerp') ? 1 : Math.min(1, acc / DT));
-    audio.engine(sim.throttle, sim.speed, !sim.dead, sim.damage); audio.rumble(sim.rumble || 0);
+    audio.engine(sim.throttle, sim.speed, !sim.dead, sim.damage); audio.rumble(sim.rumble || 0); if (sim.rumble > 0.25) rumble(0.12 * sim.rumble, 0.55 * sim.rumble, 70);
     $('flipNow').textContent = sim.flips; $('starNow').textContent = sim.starsGot; $('starTot').textContent = sim.starsTotal;
     $('dmgFill').style.width = `${Math.round(sim.damage * 100)}%`; $('dmgFill').style.background = `hsl(${Math.round(120 - 120 * sim.damage)},80%,55%)`;
 

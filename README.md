@@ -9,6 +9,8 @@ Built to play with kids — and to record: one video can cover many stages (the 
 | **GAS** (hold) | `Space` (or ↑ → D W) | big green button |
 | **RESET** (back to last checkpoint) | `R` | big orange button |
 
+**Gamepad / joystick (Windows PC, Mac, Linux, Android; Chrome / Edge / Firefox):** plug in or pair a controller, press any button, and it works: **A / X / RB / LT / RT, or push the stick (or D-pad) forward = GAS**, **B / Y = RESET**, **Start = stage menu** (D-pad or stick to move, **A** to pick, **B** or Start to close), **Back/View = random stage**. Generic USB joysticks work too (button 1 = gas, button 2 = reset, stick forward = gas). Controllers with rumble (Xbox etc.) shake on bumps, crashes, flips and boosts.
+
 Extras: the **⛶ full-screen button** (or `F`; on iPhone use *Share → Add to Home Screen*, then open it from the Home Screen: it is installable and runs full screen in landscape), the **☰ Stages** button (or `Esc`) opens the stage picker (any stage, restart, music on/off). **🎲** jumps to a random stage, and the menu can switch auto-advance between *in order* and *random* (handy for recording). Direct link to a stage: `…/#37`.
 Finish a stage → ★ rating by time (par is based on a test bot) → next stage starts automatically (or press GAS).
 
